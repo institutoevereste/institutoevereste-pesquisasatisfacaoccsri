@@ -134,7 +134,6 @@
                 updateChart(eventCharts, 'event-speakers-chart', 'pie', 'Qualidade dos Palestrantes', processRadioData(responses, 'palestrantes'));
                 updateChart(eventCharts, 'event-content-chart', 'pie', 'Qualidade do Conteúdo', processRadioData(responses, 'instalacoes'));
                 updateChart(eventCharts, 'event-recommend-chart', 'doughnut', 'Recomendaria o Evento?', processRadioData(responses, 'recomendaria'));
-                // ***** NOVO: Adiciona o gráfico de NPS do Evento *****
                 updateChart(eventCharts, 'event-nps-chart', 'bar', 'NPS do Evento', processNPSData(responses, 'npsEvento'));
             });
         }
@@ -151,7 +150,6 @@
                 updateChart(satisfactionCharts, 'satisfaction-attendant-chart', 'bar', 'Atendentes', processRadioData(responses, 'atendente'));
                 updateChart(satisfactionCharts, 'satisfaction-process-chart', 'doughnut', 'Facilidade do Processo', processRadioData(responses, 'facilidade_processo'));
                 updateChart(satisfactionCharts, 'satisfaction-overall-chart', 'pie', 'Satisfação Geral com a CCSRI', processRadioData(responses, 'satisfacao_ccsri'));
-                // ***** NOVO: Adiciona o gráfico de NPS do Colaborador *****
                 updateChart(satisfactionCharts, 'satisfaction-nps-chart', 'bar', 'NPS do Colaborador', processNPSData(responses, 'npsColaborador'));
 
                 const commentsList = document.getElementById('satisfaction-comments-list');
@@ -159,7 +157,7 @@
                 
                 if (responses.length === 0) {
                     const li = document.createElement('li');
-                    li.className = 'text-gray-500 italic';
+                    li.className = 'text-gray-300 italic';
                     li.textContent = 'Ainda não há comentários para exibir.';
                     commentsList.appendChild(li);
                 } else {
@@ -167,14 +165,14 @@
                         const commentText = res.comentarioSugestao || "Nenhuma sugestão fornecida.";
                         
                         const li = document.createElement('li');
-                        li.className = 'bg-gray-50 p-4 rounded-lg border border-gray-200';
+                        li.className = 'bg-white/10 p-4 rounded-lg border border-white/20';
                         
                         const nameSpan = document.createElement('span');
-                        nameSpan.className = 'font-bold text-evereste-blue';
+                        nameSpan.className = 'font-bold text-evereste-green';
                         nameSpan.textContent = `${res.nome || 'Anônimo'}: `;
                         
                         const commentSpan = document.createElement('span');
-                        commentSpan.className = 'text-gray-700';
+                        commentSpan.className = 'text-gray-200';
                         commentSpan.textContent = commentText;
 
                         li.appendChild(nameSpan);
@@ -205,10 +203,9 @@
              return { labels: Object.keys(counts), data: Object.values(counts) };
         }
         
-        // ***** NOVO: Função para processar dados de NPS (0-10) *****
         function processNPSData(responses, field) {
-            const labels = Array.from({ length: 11 }, (_, i) => i.toString()); // Cria labels '0' a '10'
-            const data = Array(11).fill(0); // Inicializa os contadores com 0
+            const labels = Array.from({ length: 11 }, (_, i) => i.toString());
+            const data = Array(11).fill(0);
             responses.forEach(res => {
                 const value = res[field];
                 if (value !== undefined && value !== null && value !== "") {
@@ -224,6 +221,34 @@
         function updateChart(chartRepo, canvasId, type, label, chartData) {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return;
+            
+            // Define opções de cores para os gráficos no modo escuro
+            const chartOptionsDark = {
+                plugins: {
+                    legend: { 
+                        display: false,
+                        labels: { color: '#E5E7EB' }
+                    },
+                    title: { 
+                        display: true, 
+                        text: label, 
+                        font: { size: 16, family: 'Nunito' },
+                        color: '#FFFFFF'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#D1D5DB' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    },
+                    x: {
+                        ticks: { color: '#D1D5DB' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    }
+                }
+            };
+            
             if (chartRepo[canvasId]) {
                 chartRepo[canvasId].data.labels = chartData.labels;
                 chartRepo[canvasId].data.datasets[0].data = chartData.data;
@@ -239,28 +264,20 @@
                             backgroundColor: (canvasId.includes('nps')) 
                                 ? chartData.labels.map(label => {
                                     const score = parseInt(label, 10);
-                                    if (score <= 6) return '#F87171'; // Detratores (vermelho)
-                                    if (score <= 8) return '#FBBF24'; // Neutros (amarelo)
-                                    return '#3DB79E'; // Promotores (verde)
+                                    if (score <= 6) return '#F87171'; // Detratores
+                                    if (score <= 8) return '#FBBF24'; // Neutros
+                                    return '#3DB79E'; // Promotores
                                   })
-                                : (type === 'bar') ? '#3DB79E' : ['#3DB79E', '#1F5DA6', '#FBBF24', '#60A5FA', '#F87171', '#A78BFA'],
-                            borderColor: '#ffffff',
-                            borderWidth: (type === 'bar') ? 0 : 2,
+                                : (type === 'bar') ? 'rgba(61, 183, 158, 0.8)' : ['#3DB79E', '#1F5DA6', '#FBBF24', '#60A5FA', '#F87171', '#A78BFA'],
+                            borderColor: '#1F2937',
+                            borderWidth: 2,
                         }]
                     },
                     options: {
+                        ...chartOptionsDark,
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false }, // Legenda desativada para NPS para não poluir
-                            title: { display: true, text: label, font: { size: 16, family: 'Nunito' } }
-                        },
                         indexAxis: (type === 'bar' && !canvasId.includes('nps')) ? 'y' : 'x',
-                        scales: {
-                            y: {
-                                beginAtZero: true
-                            }
-                        }
                     }
                 });
             }
@@ -284,7 +301,6 @@
                         conteudo: eventForm.elements['conteudo'].value,
                         instalacoes: eventForm.elements['instalacoes'].value,
                         recomendaria: eventForm.elements['recomendaria'].value,
-                        // ***** NOVO: Adiciona o campo npsEvento *****
                         npsEvento: eventForm.elements['npsEvento'].value,
                         timestamp: new Date()
                     };
@@ -317,7 +333,6 @@
                         facilidade_processo: satisfactionForm.elements['facilidade_processo'].value,
                         satisfacao_ccsri: satisfactionForm.elements['satisfacao_ccsri'].value, 
                         comentarioSugestao: satisfactionForm.elements['comentarios'].value,
-                        // ***** NOVO: Adiciona o campo npsColaborador *****
                         npsColaborador: satisfactionForm.elements['npsColaborador'].value,
                         timestamp: new Date()
                     };
@@ -497,21 +512,27 @@
         </footer>
     </div>
     
-    <!-- CONTEÚDO DO ADMINISTRADOR (INICIALMENTE OCULTO) -->
-    <div id="admin-content" class="hidden bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen">
+    <!-- ***** INÍCIO DAS ALTERAÇÕES NO PAINEL ADMIN ***** -->
+    <div id="admin-content" class="hidden bg-gradient-to-br from-evereste-green to-evereste-blue min-h-screen text-white">
          <div class="fixed top-4 right-4 z-40">
-            <button id="logout-btn" class="bg-white/50 backdrop-blur-sm text-gray-700 font-bold py-2 px-4 rounded-full shadow-lg hover:bg-white/80 transition-colors flex items-center gap-2">
+            <button id="logout-btn" class="bg-white/20 backdrop-blur-sm text-white font-bold py-2 px-4 rounded-full shadow-lg hover:bg-white/30 transition-colors flex items-center gap-2">
                 <i data-feather="log-out" class="w-5 h-5"></i>
                 <span>Sair</span>
             </button>
         </div>
-        <main class="py-16 md:py-24 px-4 sm:px-6">
-            <div class="max-w-7xl mx-auto">
-                <h2 class="text-4xl font-extrabold text-center text-gray-800 mb-4">ADMIN CCSRI</h2>
-                <p class="text-center text-gray-600 mb-12">Resultados em tempo real das avaliações.</p>
-                <div class="bg-white/90 backdrop-blur-sm p-4 sm:p-8 rounded-2xl shadow-lg mb-12">
-                    <h3 class="text-2xl font-bold text-evereste-green mb-1">Resultados da Avaliação de Eventos</h3>
-                    <p class="text-gray-600 mb-6">Total de Respostas: <span id="event-response-count" class="font-bold">0</span></p>
+        
+        <!-- Novo Banner do Admin -->
+        <header class="text-center pt-16 pb-12 px-4">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-white">Dashboard Pesquisa de Satisfação CCSRI</h1>
+            <p class="text-white/80 mt-2">Resultados em tempo real das avaliações.</p>
+        </header>
+
+        <main class="pb-16 md:pb-24 px-4 sm:px-6">
+            <div class="max-w-7xl mx-auto space-y-12">
+                <!-- Seção de Eventos -->
+                <div class="bg-black/20 backdrop-blur-sm p-4 sm:p-8 rounded-2xl shadow-lg">
+                    <h3 class="text-2xl font-bold text-white mb-1">Resultados da Avaliação de Eventos</h3>
+                    <p class="text-gray-300 mb-6">Total de Respostas: <span id="event-response-count" class="font-bold">0</span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div class="h-64 md:h-72"><canvas id="event-satisfaction-chart"></canvas></div>
                         <div class="h-64 md:h-72"><canvas id="event-organization-chart"></canvas></div>
@@ -519,13 +540,13 @@
                         <div class="h-64 md:h-72"><canvas id="event-content-chart"></canvas></div>
                         <div class="h-64 md:h-72"><canvas id="event-facilities-chart"></canvas></div>
                         <div class="h-64 md:h-72"><canvas id="event-recommend-chart"></canvas></div>
-                        <!-- ***** NOVO: Canvas para o gráfico NPS do Evento ***** -->
                         <div class="md:col-span-2 lg:col-span-3 h-80"><canvas id="event-nps-chart"></canvas></div>
                     </div>
                 </div>
-                <div class="bg-white/90 backdrop-blur-sm p-4 sm:p-8 rounded-2xl shadow-lg">
-                    <h3 class="text-2xl font-bold text-evereste-blue mb-1">Resultados da Pesquisa de Satisfação (CCSRI)</h3>
-                    <p class="text-gray-600 mb-6">Total de Respostas: <span id="satisfaction-response-count" class="font-bold">0</span></p>
+                <!-- Seção de Satisfação -->
+                <div class="bg-black/20 backdrop-blur-sm p-4 sm:p-8 rounded-2xl shadow-lg">
+                    <h3 class="text-2xl font-bold text-white mb-1">Resultados da Pesquisa de Satisfação (CCSRI)</h3>
+                    <p class="text-gray-300 mb-6">Total de Respostas: <span id="satisfaction-response-count" class="font-bold">0</span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div class="h-64 md:h-72"><canvas id="satisfaction-timing-chart"></canvas></div>
                         <div class="h-64 md:h-72"><canvas id="satisfaction-quality-chart"></canvas></div>
@@ -533,11 +554,10 @@
                         <div class="h-64 md:h-72"><canvas id="satisfaction-overall-chart"></canvas></div>
                         <div class="md:col-span-2 h-80"><canvas id="satisfaction-attendant-chart"></canvas></div>
                         <div class="lg:col-span-3 h-80"><canvas id="satisfaction-product-chart"></canvas></div>
-                        <!-- ***** NOVO: Canvas para o gráfico NPS do Colaborador ***** -->
                         <div class="md:col-span-2 lg:col-span-3 h-80"><canvas id="satisfaction-nps-chart"></canvas></div>
                     </div>
                     <div class="mt-12">
-                        <h4 class="text-xl font-bold text-gray-700 mb-4">Comentários e Sugestões</h4>
+                        <h4 class="text-xl font-bold text-white mb-4">Comentários e Sugestões</h4>
                         <ul id="satisfaction-comments-list" class="space-y-4 max-h-96 overflow-y-auto p-2">
                             <!-- Os comentários serão inseridos aqui pelo JavaScript -->
                         </ul>
@@ -546,6 +566,7 @@
             </div>
         </main>
     </div>
+    <!-- ***** FIM DAS ALTERAÇÕES NO PAINEL ADMIN ***** -->
 
     <!-- MODAIS E NOTIFICAÇÕES -->
     <div id="event-modal" class="hidden fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 animate-fade-in">
@@ -556,7 +577,6 @@
             </div>
             <div class="p-6 sm:p-8 max-h-[75vh] overflow-y-auto modal-content">
                 <form id="event-form" class="space-y-6">
-                    <!-- Campos existentes... -->
                     <div>
                         <label for="event-name" class="block text-sm font-bold text-gray-700 mb-1">Seu Nome</label>
                         <input type="text" name="nome" id="event-name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-evereste-green focus:border-evereste-green">
@@ -626,22 +646,11 @@
                             <label class="flex items-center"><input type="radio" name="recomendaria" value="Talvez" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Talvez</span></label>
                         </div>
                     </fieldset>
-                    <!-- ***** NOVO: Pergunta NPS para Eventos ***** -->
                     <div>
                         <label for="nps-evento" class="block text-sm font-bold text-gray-700 mb-1">8. Em uma escala de 0 a 10, o quanto você recomendaria este evento para um amigo ou colega?</label>
                         <select name="npsEvento" id="nps-evento" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-evereste-green focus:border-evereste-green">
                             <option value="" disabled selected>Selecione uma nota de 0 a 10</option>
-                            <option value="0">0 - Nada provável</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
-                            <option value="9">9</option>
-                            <option value="10">10 - Extremamente provável</option>
+                            <option value="0">0 - Nada provável</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10 - Extremamente provável</option>
                         </select>
                     </div>
                     <div class="text-center pt-4">
@@ -659,7 +668,6 @@
             </div>
             <div class="p-6 sm:p-8 max-h-[75vh] overflow-y-auto modal-content">
                 <form id="satisfaction-form" class="space-y-6">
-                    <!-- Campos existentes... -->
                     <div>
                         <label for="satisfaction-name" class="block text-sm font-bold text-gray-700 mb-1">Nome</label>
                         <input type="text" name="nome" id="satisfaction-name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-evereste-blue focus:border-evereste-blue">
@@ -729,22 +737,11 @@
                         <label for="comments" class="block text-sm font-bold text-gray-700 mb-1">7. Você tem algum comentário ou sugestão?</label>
                         <textarea name="comentarios" id="comments" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-evereste-blue focus:border-evereste-blue"></textarea>
                     </div>
-                    <!-- ***** NOVO: Pergunta NPS para Colaborador ***** -->
                      <div>
                         <label for="nps-colaborador" class="block text-sm font-bold text-gray-700 mb-1">8. Em uma escala de 0 a 10, o quanto você recomendaria o atendimento deste colaborador para um amigo ou colega?</label>
                         <select name="npsColaborador" id="nps-colaborador" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-evereste-blue focus:border-evereste-blue">
                             <option value="" disabled selected>Selecione uma nota de 0 a 10</option>
-                            <option value="0">0 - Nada provável</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
-                            <option value="9">9</option>
-                            <option value="10">10 - Extremamente provável</option>
+                            <option value="0">0 - Nada provável</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10 - Extremamente provável</option>
                         </select>
                     </div>
                     <div class="text-center pt-4">
