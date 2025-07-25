@@ -157,7 +157,7 @@
                 
                 if (responses.length === 0) {
                     const li = document.createElement('li');
-                    li.className = 'text-gray-300 italic';
+                    li.className = 'text-gray-500 italic';
                     li.textContent = 'Ainda não há comentários para exibir.';
                     commentsList.appendChild(li);
                 } else {
@@ -165,14 +165,14 @@
                         const commentText = res.comentarioSugestao || "Nenhuma sugestão fornecida.";
                         
                         const li = document.createElement('li');
-                        li.className = 'bg-white/10 p-4 rounded-lg border border-white/20';
+                        li.className = 'bg-gray-50 p-4 rounded-lg border border-gray-200';
                         
                         const nameSpan = document.createElement('span');
-                        nameSpan.className = 'font-bold text-evereste-green';
+                        nameSpan.className = 'font-bold text-evereste-blue';
                         nameSpan.textContent = `${res.nome || 'Anônimo'}: `;
                         
                         const commentSpan = document.createElement('span');
-                        commentSpan.className = 'text-gray-200';
+                        commentSpan.className = 'text-gray-700';
                         commentSpan.textContent = commentText;
 
                         li.appendChild(nameSpan);
@@ -221,30 +221,30 @@
         function updateChart(chartRepo, canvasId, type, label, chartData) {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return;
-            
-            // Define opções de cores para os gráficos no modo escuro
-            const chartOptionsDark = {
+
+            const chartOptionsLight = {
                 plugins: {
                     legend: { 
-                        display: false,
-                        labels: { color: '#E5E7EB' }
+                        display: (type === 'bar' && !canvasId.includes('nps')) || type === 'pie' || type === 'doughnut',
+                        position: 'right',
+                        labels: { color: '#374151' }
                     },
                     title: { 
                         display: true, 
                         text: label, 
                         font: { size: 16, family: 'Nunito' },
-                        color: '#FFFFFF'
+                        color: '#111827'
                     }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
-                        ticks: { color: '#D1D5DB' },
-                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        ticks: { color: '#4B5563' },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
                     },
                     x: {
-                        ticks: { color: '#D1D5DB' },
-                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        ticks: { color: '#4B5563' },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
                     }
                 }
             };
@@ -264,17 +264,17 @@
                             backgroundColor: (canvasId.includes('nps')) 
                                 ? chartData.labels.map(label => {
                                     const score = parseInt(label, 10);
-                                    if (score <= 6) return '#F87171'; // Detratores
-                                    if (score <= 8) return '#FBBF24'; // Neutros
-                                    return '#3DB79E'; // Promotores
+                                    if (score <= 6) return '#EF4444'; // Detratores (vermelho)
+                                    if (score <= 8) return '#F59E0B'; // Neutros (amarelo)
+                                    return '#10B981'; // Promotores (verde)
                                   })
-                                : (type === 'bar') ? 'rgba(61, 183, 158, 0.8)' : ['#3DB79E', '#1F5DA6', '#FBBF24', '#60A5FA', '#F87171', '#A78BFA'],
-                            borderColor: '#1F2937',
+                                : (type === 'bar') ? '#3DB79E' : ['#3DB79E', '#1F5DA6', '#FBBF24', '#60A5FA', '#F87171', '#A78BFA'],
+                            borderColor: '#FFFFFF',
                             borderWidth: 2,
                         }]
                     },
                     options: {
-                        ...chartOptionsDark,
+                        ...chartOptionsLight,
                         responsive: true,
                         maintainAspectRatio: false,
                         indexAxis: (type === 'bar' && !canvasId.includes('nps')) ? 'y' : 'x',
@@ -482,7 +482,7 @@
                 </svg>
 
                 <h1 class="text-4xl md:text-6xl font-extrabold mb-4 animate-fade-in-up" style="animation-delay: 0.4s;">
-                    Avalie sua experiência com a CCSRI!
+                    Avalie sua experiência conosco!
                 </h1>
                 <p class="text-lg md:text-xl max-w-3xl mx-auto mb-10 animate-fade-in-up" style="animation-delay: 0.6s;">
                     Sua opinião é essencial para continuarmos inovando com qualidade.
@@ -500,7 +500,7 @@
 
         <footer class="bg-gray-800 text-white py-8 px-6">
             <div class="max-w-7xl mx-auto text-center">
-                <p class="text-lg font-bold mb-4">Onde tem tecnologia, tem Evereste.</p>
+                <p class="text-lg font-bold mb-4">Onde tem tecnologia, tem Evereste!</p>
                 <div class="flex justify-center gap-6 mb-6">
                     <a href="https://www.instagram.com/institutoevereste" target="_blank" rel="noopener noreferrer" aria-label="Instagram" class="text-gray-400 hover:text-evereste-green transition-colors"><i data-feather="instagram"></i></a>
                     <a href="https://www.linkedin.com/company/instituto-evereste" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" class="text-gray-400 hover:text-evereste-blue transition-colors"><i data-feather="linkedin"></i></a>
@@ -512,8 +512,8 @@
         </footer>
     </div>
     
-    <!-- ***** INÍCIO DAS ALTERAÇÕES NO PAINEL ADMIN ***** -->
-    <div id="admin-content" class="hidden bg-gradient-to-br from-evereste-green to-evereste-blue min-h-screen text-white">
+    <!-- CONTEÚDO DO ADMINISTRADOR (INICIALMENTE OCULTO) -->
+    <div id="admin-content" class="hidden bg-gradient-to-br from-evereste-green to-evereste-blue min-h-screen">
          <div class="fixed top-4 right-4 z-40">
             <button id="logout-btn" class="bg-white/20 backdrop-blur-sm text-white font-bold py-2 px-4 rounded-full shadow-lg hover:bg-white/30 transition-colors flex items-center gap-2">
                 <i data-feather="log-out" class="w-5 h-5"></i>
@@ -521,7 +521,6 @@
             </button>
         </div>
         
-        <!-- Novo Banner do Admin -->
         <header class="text-center pt-16 pb-12 px-4">
             <h1 class="text-4xl md:text-5xl font-extrabold text-white">Dashboard Pesquisa de Satisfação CCSRI</h1>
             <p class="text-white/80 mt-2">Resultados em tempo real das avaliações.</p>
@@ -530,9 +529,9 @@
         <main class="pb-16 md:pb-24 px-4 sm:px-6">
             <div class="max-w-7xl mx-auto space-y-12">
                 <!-- Seção de Eventos -->
-                <div class="bg-black/20 backdrop-blur-sm p-4 sm:p-8 rounded-2xl shadow-lg">
-                    <h3 class="text-2xl font-bold text-white mb-1">Resultados da Avaliação de Eventos</h3>
-                    <p class="text-gray-300 mb-6">Total de Respostas: <span id="event-response-count" class="font-bold">0</span></p>
+                <div class="bg-white text-gray-800 p-4 sm:p-8 rounded-2xl shadow-lg">
+                    <h3 class="text-2xl font-bold text-evereste-green mb-1">Resultados da Avaliação de Eventos</h3>
+                    <p class="text-gray-600 mb-6">Total de Respostas: <span id="event-response-count" class="font-bold">0</span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div class="h-64 md:h-72"><canvas id="event-satisfaction-chart"></canvas></div>
                         <div class="h-64 md:h-72"><canvas id="event-organization-chart"></canvas></div>
@@ -544,9 +543,9 @@
                     </div>
                 </div>
                 <!-- Seção de Satisfação -->
-                <div class="bg-black/20 backdrop-blur-sm p-4 sm:p-8 rounded-2xl shadow-lg">
-                    <h3 class="text-2xl font-bold text-white mb-1">Resultados da Pesquisa de Satisfação (CCSRI)</h3>
-                    <p class="text-gray-300 mb-6">Total de Respostas: <span id="satisfaction-response-count" class="font-bold">0</span></p>
+                <div class="bg-white text-gray-800 p-4 sm:p-8 rounded-2xl shadow-lg">
+                    <h3 class="text-2xl font-bold text-evereste-blue mb-1">Resultados da Pesquisa de Satisfação (CCSRI)</h3>
+                    <p class="text-gray-600 mb-6">Total de Respostas: <span id="satisfaction-response-count" class="font-bold">0</span></p>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div class="h-64 md:h-72"><canvas id="satisfaction-timing-chart"></canvas></div>
                         <div class="h-64 md:h-72"><canvas id="satisfaction-quality-chart"></canvas></div>
@@ -557,7 +556,7 @@
                         <div class="md:col-span-2 lg:col-span-3 h-80"><canvas id="satisfaction-nps-chart"></canvas></div>
                     </div>
                     <div class="mt-12">
-                        <h4 class="text-xl font-bold text-white mb-4">Comentários e Sugestões</h4>
+                        <h4 class="text-xl font-bold text-gray-700 mb-4">Comentários e Sugestões</h4>
                         <ul id="satisfaction-comments-list" class="space-y-4 max-h-96 overflow-y-auto p-2">
                             <!-- Os comentários serão inseridos aqui pelo JavaScript -->
                         </ul>
@@ -566,7 +565,6 @@
             </div>
         </main>
     </div>
-    <!-- ***** FIM DAS ALTERAÇÕES NO PAINEL ADMIN ***** -->
 
     <!-- MODAIS E NOTIFICAÇÕES -->
     <div id="event-modal" class="hidden fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 animate-fade-in">
@@ -738,7 +736,7 @@
                         <label for="comments" class="block text-sm font-bold text-gray-700 mb-1">7. Você tem algum comentário ou sugestão?</label>
                         <textarea name="comentarios" id="comments" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-evereste-blue focus:border-evereste-blue"></textarea>
                     </div>
-                     <div>
+                    <div>
                         <label for="nps-colaborador" class="block text-sm font-bold text-gray-700 mb-1">8. Em uma escala de 0 a 10, o quanto você recomendaria o atendimento deste colaborador para um amigo ou colega?</label>
                         <select name="npsColaborador" id="nps-colaborador" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-evereste-blue focus:border-evereste-blue">
                             <option value="" disabled selected>Selecione uma nota de 0 a 10</option>
