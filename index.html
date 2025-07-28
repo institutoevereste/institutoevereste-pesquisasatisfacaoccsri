@@ -116,7 +116,8 @@
         let eventCharts = {};
         let satisfactionCharts = {};
         let areDashboardsInitialized = false;
-        let allEventResponses = []; // Armazena todas as respostas de eventos para filtragem
+        let allEventResponses = []; 
+        let allSatisfactionResponses = [];
 
         function initializeDashboards(db) {
             if (areDashboardsInitialized) return;
@@ -125,13 +126,11 @@
             areDashboardsInitialized = true;
         }
 
-        // ***** INÍCIO DA ALTERAÇÃO: Lógica do Filtro de Eventos *****
         function setupEventDashboard(db) {
             const eventCollectionRef = collection(db, "event-evals");
             const eventFilter = document.getElementById('event-filter');
             let isFilterListenerAttached = false;
 
-            // Função para atualizar a UI do dashboard de eventos
             const updateEventDashboardUI = (responses) => {
                 document.getElementById('event-response-count').textContent = responses.length;
                 updateChart(eventCharts, 'event-satisfaction-chart', 'doughnut', 'Nível de Satisfação Geral', processRadioData(responses, 'satisfacao_geral'));
@@ -145,19 +144,17 @@
             onSnapshot(eventCollectionRef, (snapshot) => {
                 allEventResponses = snapshot.docs.map(doc => doc.data());
 
-                // Popula o filtro com eventos únicos
                 const uniqueEvents = [...new Set(allEventResponses.map(res => res.evento_participado).filter(Boolean))];
                 const currentFilterValue = eventFilter.value;
-                eventFilter.innerHTML = '<option value="all">Todos os Eventos</option>'; // Reseta o filtro
+                eventFilter.innerHTML = '<option value="all">Todos os Eventos</option>';
                 uniqueEvents.sort().forEach(event => {
                     const option = document.createElement('option');
                     option.value = event;
                     option.textContent = event;
                     eventFilter.appendChild(option);
                 });
-                eventFilter.value = currentFilterValue; // Mantém o filtro selecionado se ainda existir
+                eventFilter.value = uniqueEvents.includes(currentFilterValue) ? currentFilterValue : 'all';
 
-                // Adiciona o listener de mudança apenas uma vez
                 if (!isFilterListenerAttached) {
                     eventFilter.addEventListener('change', () => {
                         const selectedEvent = eventFilter.value;
@@ -169,16 +166,16 @@
                     isFilterListenerAttached = true;
                 }
 
-                // Dispara uma atualização inicial ou com base no filtro atual
                 eventFilter.dispatchEvent(new Event('change'));
             });
         }
-        // ***** FIM DA ALTERAÇÃO *****
         
         function setupSatisfactionDashboard(db) {
             const satisfactionCollectionRef = collection(db, "satisfaction-evals");
-            onSnapshot(satisfactionCollectionRef, (snapshot) => {
-                const responses = snapshot.docs.map(doc => doc.data());
+            const satisfactionFilter = document.getElementById('satisfaction-filter');
+            let isFilterListenerAttached = false;
+
+            const updateSatisfactionDashboardUI = (responses) => {
                 document.getElementById('satisfaction-response-count').textContent = responses.length;
                 
                 updateChart(satisfactionCharts, 'satisfaction-product-chart', 'bar', 'Produtos Avaliados', processCheckboxData(responses, 'produto_avaliado'));
@@ -217,6 +214,34 @@
                         commentsList.appendChild(li);
                     });
                 }
+            };
+
+            onSnapshot(satisfactionCollectionRef, (snapshot) => {
+                allSatisfactionResponses = snapshot.docs.map(doc => doc.data());
+
+                const uniqueAttendants = [...new Set(allSatisfactionResponses.map(res => res.atendente).filter(Boolean))];
+                const currentFilterValue = satisfactionFilter.value;
+                satisfactionFilter.innerHTML = '<option value="all">Todos os Colaboradores</option>';
+                uniqueAttendants.sort().forEach(attendant => {
+                    const option = document.createElement('option');
+                    option.value = attendant;
+                    option.textContent = attendant;
+                    satisfactionFilter.appendChild(option);
+                });
+                satisfactionFilter.value = uniqueAttendants.includes(currentFilterValue) ? currentFilterValue : 'all';
+
+                if (!isFilterListenerAttached) {
+                    satisfactionFilter.addEventListener('change', () => {
+                        const selectedAttendant = satisfactionFilter.value;
+                        const filteredResponses = selectedAttendant === 'all'
+                            ? allSatisfactionResponses
+                            : allSatisfactionResponses.filter(res => res.atendente === selectedAttendant);
+                        updateSatisfactionDashboardUI(filteredResponses);
+                    });
+                    isFilterListenerAttached = true;
+                }
+
+                satisfactionFilter.dispatchEvent(new Event('change'));
             });
         }
         
@@ -529,7 +554,7 @@
                         Avaliação de Eventos
                     </button>
                     <button id="open-satisfaction-modal-btn" class="btn-hover-effect text-white bg-evereste-blue font-bold py-4 px-10 rounded-full shadow-lg text-lg w-full sm:w-auto">
-                        Pesquisa de Satisfação
+                        Avaliação de Serviços
                     </button>
                 </div>
             </div>
@@ -591,8 +616,18 @@
                 </div>
                 <!-- Seção de Satisfação -->
                 <div class="bg-white text-gray-800 p-4 sm:p-8 rounded-2xl shadow-lg">
-                    <h3 class="text-2xl font-bold text-evereste-blue mb-1">Resultados da Pesquisa de Satisfação (CCSRI)</h3>
-                    <p class="text-gray-600 mb-6">Total de Respostas: <span id="satisfaction-response-count" class="font-bold">0</span></p>
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
+                        <div>
+                            <h3 class="text-2xl font-bold text-evereste-blue mb-1">Resultados da Avaliação de Serviços (CCSRI)</h3>
+                            <p class="text-gray-600">Total de Respostas: <span id="satisfaction-response-count" class="font-bold">0</span></p>
+                        </div>
+                        <div>
+                            <label for="satisfaction-filter" class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Colaborador</label>
+                            <select id="satisfaction-filter" class="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-evereste-blue focus:border-evereste-blue">
+                                <option value="all">Todos os Colaboradores</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div class="h-64 md:h-72"><canvas id="satisfaction-timing-chart"></canvas></div>
                         <div class="h-64 md:h-72"><canvas id="satisfaction-quality-chart"></canvas></div>
@@ -708,7 +743,7 @@
     <div id="satisfaction-modal" class="hidden fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 animate-fade-in">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl animate-scale-in">
             <div class="p-6 flex justify-between items-center border-b border-gray-200">
-                 <h2 class="text-xl sm:text-2xl font-bold text-evereste-blue">Formulário de Pesquisa de Satisfação</h2>
+                 <h2 class="text-xl sm:text-2xl font-bold text-evereste-blue">Formulário de Avaliação de Serviços</h2>
                  <button id="close-satisfaction-modal-btn" class="text-gray-500 hover:text-gray-800"><i data-feather="x" class="w-8 h-8"></i></button>
             </div>
             <div class="p-6 sm:p-8 max-h-[75vh] overflow-y-auto modal-content">
@@ -791,7 +826,7 @@
                         </select>
                     </div>
                     <div class="text-center pt-4">
-                        <button type="submit" class="btn-hover-effect text-white bg-evereste-blue font-bold py-3 px-12 rounded-full shadow-lg text-lg w-full sm:w-auto">Enviar Pesquisa</button>
+                        <button type="submit" class="btn-hover-effect text-white bg-evereste-blue font-bold py-3 px-12 rounded-full shadow-lg text-lg w-full sm:w-auto">Enviar Avaliação</button>
                     </div>
                 </form>
             </div>
