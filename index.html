@@ -120,13 +120,14 @@
         let allEventResponses = []; 
         let currentFilteredEventResponses = [];
         let allSatisfactionResponses = [];
+        let currentFilteredSatisfactionResponses = [];
 
         function initializeDashboards(db) {
             if (areDashboardsInitialized) return;
-            setupEventManager(db); // NOVO: Gerenciador de eventos para o admin
+            setupEventManager(db);
             setupEventDashboard(db);
             setupSatisfactionDashboard(db);
-            setupCsvExport(); // NOVO: Configura os botões de exportação
+            setupCsvExport();
             areDashboardsInitialized = true;
         }
 
@@ -136,7 +137,7 @@
             let isFilterListenerAttached = false;
 
             const updateEventDashboardUI = (responses) => {
-                currentFilteredEventResponses = responses; // Armazena os dados filtrados para exportação
+                currentFilteredEventResponses = responses;
                 document.getElementById('event-response-count').textContent = responses.length;
                 updateChart(eventCharts, 'event-satisfaction-chart', 'doughnut', 'Nível de Satisfação Geral', processRadioData(responses, 'satisfacao_geral'));
                 updateChart(eventCharts, 'event-organization-chart', 'pie', 'Avaliação da Organização', processRadioData(responses, 'organizacao'));
@@ -146,9 +147,8 @@
                 updateChart(eventCharts, 'event-nps-chart', 'bar', 'NPS do Evento', processNPSData(responses, 'npsEvento'));
             };
 
-            onSnapshot(eventCollectionRef, (snapshot) => {
+            onSnapshot(collection(db, "event-evals"), (snapshot) => {
                 allEventResponses = snapshot.docs.map(doc => doc.data());
-
                 const uniqueEvents = [...new Set(allEventResponses.map(res => res.evento_participado).filter(Boolean))];
                 const currentFilterValue = eventFilter.value;
                 eventFilter.innerHTML = '<option value="all">Todos os Eventos</option>';
@@ -170,16 +170,16 @@
                     });
                     isFilterListenerAttached = true;
                 }
-
                 eventFilter.dispatchEvent(new Event('change'));
             });
         }
         
         function setupSatisfactionDashboard(db) {
-            const satisfactionCollectionRef = collection(db, "satisfaction-evals");
-            onSnapshot(satisfactionCollectionRef, (snapshot) => {
-                const responses = snapshot.docs.map(doc => doc.data());
-                allSatisfactionResponses = responses; // Armazena dados para exportação
+            const attendantFilter = document.getElementById('satisfaction-attendant-filter');
+            let isFilterListenerAttached = false;
+
+            const updateSatisfactionDashboardUI = (responses) => {
+                currentFilteredSatisfactionResponses = responses;
                 document.getElementById('satisfaction-response-count').textContent = responses.length;
                 
                 updateChart(satisfactionCharts, 'satisfaction-product-chart', 'bar', 'Produtos Avaliados', processCheckboxData(responses, 'produto_avaliado'));
@@ -192,7 +192,6 @@
 
                 const commentsList = document.getElementById('satisfaction-comments-list');
                 commentsList.innerHTML = ''; 
-                
                 const sortedResponses = [...responses].sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
 
                 if (sortedResponses.length === 0) {
@@ -206,6 +205,33 @@
                         commentsList.appendChild(li);
                     });
                 }
+            };
+
+            onSnapshot(collection(db, "satisfaction-evals"), (snapshot) => {
+                allSatisfactionResponses = snapshot.docs.map(doc => doc.data());
+                
+                const uniqueAttendants = [...new Set(allSatisfactionResponses.map(res => res.atendente).filter(Boolean))];
+                const currentFilterValue = attendantFilter.value;
+                attendantFilter.innerHTML = '<option value="all">Todos os Colaboradores</option>';
+                uniqueAttendants.sort().forEach(attendant => {
+                    const option = document.createElement('option');
+                    option.value = attendant;
+                    option.textContent = attendant;
+                    attendantFilter.appendChild(option);
+                });
+                attendantFilter.value = uniqueAttendants.includes(currentFilterValue) ? currentFilterValue : 'all';
+
+                if (!isFilterListenerAttached) {
+                    attendantFilter.addEventListener('change', () => {
+                        const selectedAttendant = attendantFilter.value;
+                        const filteredResponses = selectedAttendant === 'all'
+                            ? allSatisfactionResponses
+                            : allSatisfactionResponses.filter(res => res.atendente === selectedAttendant);
+                        updateSatisfactionDashboardUI(filteredResponses);
+                    });
+                    isFilterListenerAttached = true;
+                }
+                attendantFilter.dispatchEvent(new Event('change'));
             });
         }
         
@@ -415,7 +441,6 @@
         
         // --- 8. NOVAS FUNÇÕES DE ADMINISTRAÇÃO ---
         
-        // Popula o <select> do formulário de eventos com dados do Firestore
         function populateEventDropdown(db) {
             const eventsCollectionRef = collection(db, "events");
             const q = query(eventsCollectionRef, orderBy("name", "asc"));
@@ -436,14 +461,12 @@
             });
         }
         
-        // Gerencia a adição e remoção de eventos pelo admin
         function setupEventManager(db) {
             const addEventForm = document.getElementById('add-event-form');
             const newEventInput = document.getElementById('new-event-name');
             const eventList = document.getElementById('admin-event-list');
             const eventsCollectionRef = collection(db, "events");
 
-            // Adicionar novo evento
             addEventForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const eventName = newEventInput.value.trim();
@@ -459,7 +482,6 @@
                 }
             });
 
-            // Listar e permitir exclusão de eventos
             const q = query(eventsCollectionRef, orderBy("createdAt", "desc"));
             onSnapshot(q, (snapshot) => {
                 eventList.innerHTML = '';
@@ -476,11 +498,10 @@
                                       </button>`;
                         eventList.appendChild(li);
                     });
-                    feather.replace(); // Re-renderiza os ícones
+                    feather.replace();
                 }
             });
             
-            // Event listener para os botões de deletar (usando delegação)
             eventList.addEventListener('click', async (e) => {
                 const deleteBtn = e.target.closest('.delete-event-btn');
                 if (deleteBtn) {
@@ -530,7 +551,7 @@
                 exportToCsv('relatorio_eventos.csv', currentFilteredEventResponses);
             });
             document.getElementById('export-satisfaction-csv').addEventListener('click', () => {
-                exportToCsv('relatorio_satisfacao_ccsri.csv', allSatisfactionResponses);
+                exportToCsv('relatorio_satisfacao_ccsri.csv', currentFilteredSatisfactionResponses);
             });
         }
 
@@ -631,7 +652,7 @@
                         Avaliação de Eventos
                     </button>
                     <button id="open-satisfaction-modal-btn" class="btn-hover-effect text-white bg-evereste-blue font-bold py-4 px-10 rounded-full shadow-lg text-lg w-full sm:w-auto">
-                        Pesquisa de Satisfação
+                        Avaliação de Serviços
                     </button>
                 </div>
             </div>
@@ -687,7 +708,6 @@
                         </div>
                     </div>
                     
-                    <!-- NOVO: Gerenciador de Eventos -->
                     <div class="bg-gray-50 border border-gray-200 p-4 rounded-lg mb-6">
                         <h4 class="text-lg font-bold text-gray-700 mb-3">Gerenciar Eventos</h4>
                         <form id="add-event-form" class="flex flex-col sm:flex-row gap-2 mb-4">
@@ -713,14 +733,22 @@
                 </div>
                 <!-- Seção de Satisfação -->
                 <div class="bg-white text-gray-800 p-4 sm:p-8 rounded-2xl shadow-lg">
-                    <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
+                    <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                         <div>
-                            <h3 class="text-2xl font-bold text-evereste-blue mb-1">Resultados da Pesquisa de Satisfação (CCSRI)</h3>
+                            <h3 class="text-2xl font-bold text-evereste-blue mb-1">Resultados da Avaliação de Serviços (CCSRI)</h3>
                             <p class="text-gray-600">Total de Respostas: <span id="satisfaction-response-count" class="font-bold">0</span></p>
                         </div>
-                        <button id="export-satisfaction-csv" class="w-full sm:w-auto bg-evereste-blue text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-opacity-90 transition flex items-center justify-center gap-2">
-                            <i data-feather="download" class="w-4 h-4"></i> Exportar CSV
-                        </button>
+                        <div class="flex flex-col sm:flex-row gap-4 items-center">
+                            <div>
+                                <label for="satisfaction-attendant-filter" class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Colaborador</label>
+                                <select id="satisfaction-attendant-filter" class="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-evereste-blue focus:border-evereste-blue">
+                                    <option value="all">Todos os Colaboradores</option>
+                                </select>
+                            </div>
+                            <button id="export-satisfaction-csv" class="w-full sm:w-auto mt-2 sm:mt-6 bg-evereste-blue text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-opacity-90 transition flex items-center justify-center gap-2">
+                                <i data-feather="download" class="w-4 h-4"></i> Exportar CSV
+                            </button>
+                        </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div class="h-64 md:h-72"><canvas id="satisfaction-timing-chart"></canvas></div>
@@ -840,7 +868,7 @@
     <div id="satisfaction-modal" class="hidden fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 animate-fade-in">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl animate-scale-in">
             <div class="p-6 flex justify-between items-center border-b border-gray-200">
-                 <h2 class="text-xl sm:text-2xl font-bold text-evereste-blue">Formulário de Pesquisa de Satisfação</h2>
+                 <h2 class="text-xl sm:text-2xl font-bold text-evereste-blue">Formulário de Avaliação de Serviços</h2>
                  <button id="close-satisfaction-modal-btn" class="text-gray-500 hover:text-gray-800"><i data-feather="x" class="w-8 h-8"></i></button>
             </div>
             <div class="p-6 sm:p-8 max-h-[75vh] overflow-y-auto modal-content">
