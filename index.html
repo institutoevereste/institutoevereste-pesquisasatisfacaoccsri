@@ -95,16 +95,25 @@
                 }, 500);
             }, 3000);
         }
+
+        function showSuccessModal() {
+            const modal = document.getElementById('success-modal');
+            if(modal) modal.classList.remove('hidden');
+        }
         
         function setupModalHandlers() {
             const modals = {
                 event: { openBtn: document.getElementById('open-event-modal-btn'), closeBtn: document.getElementById('close-event-modal-btn'), modal: document.getElementById('event-modal') },
-                satisfaction: { openBtn: document.getElementById('open-satisfaction-modal-btn'), closeBtn: document.getElementById('close-satisfaction-modal-btn'), modal: document.getElementById('satisfaction-modal') }
+                satisfaction: { openBtn: document.getElementById('open-satisfaction-modal-btn'), closeBtn: document.getElementById('close-satisfaction-modal-btn'), modal: document.getElementById('satisfaction-modal') },
+                success: { openBtn: null, closeBtn: document.getElementById('close-success-modal-btn'), modal: document.getElementById('success-modal') }
             };
-            const openModal = (modal) => { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; };
-            const closeModal = (modal) => { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; };
+            const closeModal = (modal) => { 
+                if (!modal) return;
+                modal.classList.add('hidden'); 
+                document.body.style.overflow = 'auto'; 
+            };
             Object.values(modals).forEach(({ openBtn, closeBtn, modal }) => {
-                if (openBtn) openBtn.addEventListener('click', () => openModal(modal));
+                if (openBtn) openBtn.addEventListener('click', () => { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; });
                 if (closeBtn) closeBtn.addEventListener('click', () => closeModal(modal));
                 if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(modal); });
             });
@@ -367,10 +376,10 @@
                     };
                     try {
                         await addDoc(collection(db, "event-evals"), data);
-                        showNotification('Avaliação enviada com sucesso!');
                         eventForm.reset();
                         document.getElementById('event-modal').classList.add('hidden');
                         document.body.style.overflow = 'auto';
+                        showSuccessModal();
                     } catch (error) {
                         console.error("Erro ao enviar avaliação de evento:", error);
                         showNotification('Ocorreu um erro. Tente novamente.', false);
@@ -408,10 +417,10 @@
                     };
                      try {
                         await addDoc(collection(db, "satisfaction-evals"), data);
-                        showNotification('Pesquisa enviada com sucesso!');
                         satisfactionForm.reset();
                         document.getElementById('satisfaction-modal').classList.add('hidden');
                         document.body.style.overflow = 'auto';
+                        showSuccessModal();
                     } catch (error) {
                         console.error("Erro ao enviar pesquisa de satisfação:", error);
                         showNotification('Ocorreu um erro. Tente novamente.', false);
@@ -587,12 +596,14 @@
                         fadeOut: { 'from': { opacity: '1' }, 'to': { opacity: '0' } },
                         scaleIn: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
                         fadeInUp: { '0%': { opacity: '0', transform: 'translateY(25px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+                        stroke: { '100%': { strokeDashoffset: '0' } }
                     },
                     animation: {
                         'fade-in': 'fadeIn 0.4s ease-out forwards',
                         'fade-out': 'fadeOut 0.5s ease-out forwards',
                         'scale-in': 'scaleIn 0.4s ease-out forwards',
                         'fade-in-up': 'fadeInUp 0.8s ease-out forwards',
+                        'stroke': 'stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards'
                     }
                 }
             }
@@ -612,6 +623,30 @@
         .modal-content::-webkit-scrollbar-track { background: #f1f1f1; }
         .modal-content::-webkit-scrollbar-thumb { background: #aaa; border-radius: 4px; }
         .modal-content::-webkit-scrollbar-thumb:hover { background: #888; }
+
+        /* Estilos para a animação do ícone de sucesso */
+        .success-animation-container { display: block; }
+        #success-modal:not(.hidden) .checkmark__circle {
+             animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+        }
+        #success-modal:not(.hidden) .checkmark__check {
+            animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+        }
+        .checkmark__circle {
+            stroke-dasharray: 166;
+            stroke-dashoffset: 166;
+            stroke-width: 3;
+            stroke-miterlimit: 10;
+            stroke: #3DB79E; /* evereste-green */
+            fill: none;
+        }
+        .checkmark__check {
+            transform-origin: 50% 50%;
+            stroke-dasharray: 48;
+            stroke-dashoffset: 48;
+            stroke-width: 4;
+            stroke: #3DB79E; /* evereste-green */
+        }
     </style>
 </head>
 <body class="bg-gray-100 font-sans text-gray-800">
@@ -999,6 +1034,24 @@
             </div>
         </div>
     </div>
+
+    <!-- MODAL DE SUCESSO PÓS-ENVIO -->
+    <div id="success-modal" class="hidden fixed inset-0 bg-black/70 z-[110] flex items-center justify-center p-4 animate-fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md text-center p-8 animate-scale-in">
+            <div class="w-24 h-24 mx-auto mb-4 success-animation-container">
+                <svg class="w-full h-full" viewBox="0 0 52 52">
+                    <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none"/>
+                    <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Obrigado por sua resposta!</h2>
+            <p class="text-gray-600 mb-6">Sua opinião é muito importante para nós. Seus dados serão tratados com confidencialidade, conforme nossa Política de Privacidade e a LGPD.</p>
+            <button id="close-success-modal-btn" class="bg-evereste-green text-white font-bold py-2 px-8 rounded-full shadow-lg hover:bg-opacity-90 transition-transform transform hover:scale-105">
+                Fechar
+            </button>
+        </div>
+    </div>
+    
     <div id="notification-modal" class="hidden">
         <p id="notification-message"></p>
     </div>
