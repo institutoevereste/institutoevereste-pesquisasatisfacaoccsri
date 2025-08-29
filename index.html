@@ -639,6 +639,7 @@
             stroke-miterlimit: 10;
             stroke: #3DB79E; /* evereste-green */
             fill: none;
+            stroke-linecap: round; /* Adicionado para melhor renderização */
         }
         .checkmark__check {
             transform-origin: 50% 50%;
@@ -646,6 +647,9 @@
             stroke-dashoffset: 48;
             stroke-width: 4;
             stroke: #3DB79E; /* evereste-green */
+            stroke-linecap: round; /* Adicionado para melhor renderização */
+            stroke-linejoin: round; /* Adicionado para melhor renderização */
+            fill: none;
         }
     </style>
 </head>
@@ -953,15 +957,18 @@
                         <input type="text" name="setor_unidade" id="sector" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-evereste-blue focus:border-evereste-blue">
                     </div>
                     <fieldset>
-                        <legend class="block text-sm font-bold text-gray-700 mb-2">1. Qual produto você está avaliando? (mínimo 1)</legend>
+                        <legend class="block text-sm font-bold text-gray-700 mb-2">1. Qual produto/serviço avaliado? (mínimo 1)</legend>
                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Portal Institucional" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Portal Institucional</span></label>
-                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="TV Institucional" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">TV Institucional</span></label>
-                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Peça Institucional" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Peça Institucional</span></label>
-                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Peça Gráfica" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Peça Gráfica</span></label>
-                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Vídeo" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Vídeo</span></label>
                             <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Captação de Material" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Captação de Material</span></label>
+                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Cerimonial e Eventos" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Cerimonial e Eventos</span></label>
+                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Estratégia de Marketing" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Estratégia de Marketing</span></label>
+                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Impressos" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Impressos</span></label>
+                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Peça Gráfica" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Peça Gráfica</span></label>
+                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Peça Institucional" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Peça Institucional</span></label>
+                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Portal Institucional" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Portal Institucional</span></label>
                             <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Treinamento" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Treinamento</span></label>
+                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="TV Institucional" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">TV Institucional</span></label>
+                            <label class="flex items-center"><input type="checkbox" name="produto_avaliado[]" value="Vídeo" class="h-4 w-4 text-evereste-blue rounded focus:ring-evereste-blue"><span class="ml-2">Vídeo</span></label>
                         </div>
                     </fieldset>
                     <fieldset>
