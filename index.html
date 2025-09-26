@@ -96,7 +96,7 @@
                     modal.classList.add('hidden');
                     modal.classList.remove('animate-fade-out');
                 }, 500);
-            }, 4000); // Aumentado o tempo para dar tempo de ler "Gerando PDF..."
+            }, 4000);
         }
 
         function showSuccessModal() {
@@ -143,7 +143,7 @@
             setupEventDashboard(db);
             setupSatisfactionDashboard(db);
             setupCsvExport();
-            setupPdfExport(); // NOVO: Inicializa a exportação em PDF
+            setupPdfExport();
             areDashboardsInitialized = true;
         }
 
@@ -160,13 +160,10 @@
                 updateChart(eventCharts, 'event-content-chart', 'pie', 'Qualidade do Conteúdo', processRadioData(responses, 'conteudo'));
                 updateChart(eventCharts, 'event-facilities-chart', 'pie', 'Qualidade das Instalações', processRadioData(responses, 'instalacoes'));
                 updateChart(eventCharts, 'event-recommend-chart', 'doughnut', 'Recomendaria o Evento?', processRadioData(responses, 'recomendaria'));
-                
-                // NOVOS GRÁFICOS DE INFRAESTRUTURA
                 updateChart(eventCharts, 'event-transmission-chart', 'pie', 'Qualidade da Transmissão', processRadioData(responses, 'transmissao'));
                 updateChart(eventCharts, 'event-audio-video-chart', 'pie', 'Qualidade de Áudio e Vídeo', processRadioData(responses, 'audio_video'));
                 updateChart(eventCharts, 'event-connection-chart', 'pie', 'Qualidade da Conexão', processRadioData(responses, 'conexao'));
                 updateChart(eventCharts, 'event-lighting-chart', 'pie', 'Qualidade da Iluminação', processRadioData(responses, 'iluminacao'));
-
                 updateChart(eventCharts, 'event-nps-chart', 'bar', 'NPS do Evento', processNPSData(responses, 'npsEvento'));
             };
 
@@ -384,7 +381,6 @@
                         palestrantes: eventForm.elements['palestrantes'].value,
                         conteudo: eventForm.elements['conteudo'].value,
                         instalacoes: eventForm.elements['instalacoes'].value,
-                        // NOVOS CAMPOS DE INFRAESTRUTURA
                         transmissao: eventForm.elements['transmissao'].value,
                         audio_video: eventForm.elements['audio_video'].value,
                         conexao: eventForm.elements['conexao'].value,
@@ -600,82 +596,143 @@
                 exportToCsv('relatorio_satisfacao_ccsri.csv', currentFilteredSatisfactionResponses);
             });
         }
-
-        // NOVA FUNÇÃO PARA EXPORTAR PDF
-        function exportToPdf(elementId, filename, title, orientation = 'p') {
-            const { jsPDF } = window.jspdf;
-            const targetElement = document.getElementById(elementId);
-            if (!targetElement) {
-                showNotification("Elemento do relatório não encontrado.", false);
+        
+        // ALTERAÇÃO: Função de exportar PDF foi reescrita para gerar um relatório de texto.
+        function generatePdfReport(reportType, data, title, filename) {
+            if (!data || data.length === 0) {
+                showNotification("Não há dados para exportar.", false);
                 return;
             }
+            showNotification("Gerando relatório em PDF...", true);
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+            
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const margin = 40;
+            let y = margin;
 
-            showNotification("Gerando PDF, por favor aguarde...", true);
-            const originalBackgroundColor = targetElement.style.backgroundColor;
-            targetElement.style.backgroundColor = '#FFFFFF';
-
-            html2canvas(targetElement, {
-                scale: 2, // Aumenta a resolução da imagem
-                useCORS: true,
-                logging: true,
-                windowWidth: targetElement.scrollWidth,
-                windowHeight: targetElement.scrollHeight
-            }).then(canvas => {
-                targetElement.style.backgroundColor = originalBackgroundColor;
-                const imgData = canvas.toDataURL('image/png');
-                const pdf = new jsPDF({
-                    orientation: orientation,
-                    unit: 'pt',
-                    format: 'a4'
-                });
-
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = pdf.internal.pageSize.getHeight();
-                const margin = 40;
-                
-                const imgProps= pdf.getImageProperties(imgData);
-                const imgWidth = pdfWidth - margin * 2;
-                const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-                let heightLeft = imgHeight;
-                let position = margin;
-
-                pdf.setFontSize(20);
-                pdf.text(title, pdfWidth / 2, position, { align: 'center' });
-                position = margin + 30; // Move position down for the image
-
-                pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-                heightLeft -= (pdfHeight - margin * 2 - 30);
-
-                while (heightLeft > 0) {
-                    position = -heightLeft + margin;
-                    pdf.addPage();
-                    pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-                    heightLeft -= (pdfHeight - margin);
+            // Função auxiliar para adicionar texto e controlar a posição Y e quebras de página
+            const addText = (text, size, isBold = false, align = 'left', x = margin) => {
+                if (y > doc.internal.pageSize.getHeight() - margin) {
+                    doc.addPage();
+                    y = margin;
                 }
+                doc.setFontSize(size);
+                doc.setFont(undefined, isBold ? 'bold' : 'normal');
+                const textX = align === 'center' ? pageWidth / 2 : x;
+                doc.text(text, textX, y, { align: align });
+                // Incrementa Y baseado no número de linhas do texto
+                const splitText = doc.splitTextToSize(text.toString(), pageWidth - margin * 2);
+                y += (splitText.length * size * 1.2);
+            };
 
-                pdf.save(filename);
-            }).catch(err => {
-                targetElement.style.backgroundColor = originalBackgroundColor;
-                console.error("Erro ao gerar PDF:", err);
-                showNotification("Ocorreu um erro ao gerar o PDF.", false);
-            });
+            // --- CABEÇALHO DO DOCUMENTO ---
+            addText(title, 18, true, 'center');
+            y += 5;
+            addText(`Relatório gerado em: ${new Date().toLocaleString('pt-BR')}`, 8, false, 'center');
+            y += 10;
+            addText(`Total de Respostas Analisadas: ${data.length}`, 10);
+            y += 25;
+
+            // --- CONTEÚDO DO RELATÓRIO ---
+            const totalResponses = data.length;
+
+            if (reportType === 'event') {
+                const eventQuestions = [
+                    { q: 'Nível de Satisfação Geral com o Evento', key: 'satisfacao_geral', type: 'radio' },
+                    { q: 'O Evento Atendeu às Expectativas?', key: 'expectativas', type: 'checkbox' },
+                    { q: 'Avaliação da Organização do Evento', key: 'organizacao', type: 'radio' },
+                    { q: 'Qualidade dos Palestrantes/Convidados', key: 'palestrantes', type: 'radio' },
+                    { q: 'Qualidade do Conteúdo Apresentado', key: 'conteudo', type: 'radio' },
+                    { q: 'Avaliação das Instalações', key: 'instalacoes', type: 'radio' },
+                    { q: 'Qualidade da Transmissão', key: 'transmissao', type: 'radio' },
+                    { q: 'Qualidade de Áudio e Vídeo', key: 'audio_video', type: 'radio' },
+                    { q: 'Estabilidade da Conexão/Plataforma', key: 'conexao', type: 'radio' },
+                    { q: 'Avaliação da Iluminação', key: 'iluminacao', type: 'radio' },
+                    { q: 'Recomendaria este Evento?', key: 'recomendaria', type: 'radio' },
+                    { q: 'NPS do Evento (0 a 10)', key: 'npsEvento', type: 'nps' },
+                ];
+
+                eventQuestions.forEach(item => {
+                    addText(item.q, 12, true);
+                    let processedData;
+                    if (item.type === 'checkbox') processedData = processCheckboxData(data, item.key);
+                    else if (item.type === 'nps') processedData = processNPSData(data, item.key);
+                    else processedData = processRadioData(data, item.key);
+                    
+                    if (processedData.labels.length > 0) {
+                        processedData.labels.forEach((label, index) => {
+                            const count = processedData.data[index];
+                            const percentage = totalResponses > 0 ? ((count / totalResponses) * 100).toFixed(1) : 0;
+                            addText(`- ${label}: ${count} respost${count > 1 ? 'as' : 'a'} (${percentage}%)`, 10);
+                        });
+                    } else {
+                        addText('- Nenhuma resposta para esta pergunta.', 10, false);
+                    }
+                    y += 15;
+                });
+            } else if (reportType === 'satisfaction') {
+                 const satisfactionQuestions = [
+                    { q: 'Produtos/Serviços Avaliados', key: 'produto_avaliado', type: 'checkbox' },
+                    { q: 'Demanda Atendida em Tempo Hábil?', key: 'tempo_habil', type: 'radio' },
+                    { q: 'Qualidade do Produto Entregue', key: 'qualidade_produto', type: 'radio' },
+                    { q: 'Colaborador que Realizou o Atendimento', key: 'atendente', type: 'radio' },
+                    { q: 'Facilidade do Processo de Solicitação', key: 'facilidade_processo', type: 'radio' },
+                    { q: 'Nível Geral de Satisfação com a CCSRI', key: 'satisfacao_ccsri', type: 'radio' },
+                    { q: 'NPS do Colaborador (0 a 10)', key: 'npsColaborador', type: 'nps' },
+                 ];
+
+                 satisfactionQuestions.forEach(item => {
+                    addText(item.q, 12, true);
+                    let processedData;
+                    if (item.type === 'checkbox') processedData = processCheckboxData(data, item.key);
+                    else if (item.type === 'nps') processedData = processNPSData(data, item.key);
+                    else processedData = processRadioData(data, item.key);
+
+                    if (processedData.labels.length > 0) {
+                         processedData.labels.forEach((label, index) => {
+                            const count = processedData.data[index];
+                            const percentage = totalResponses > 0 ? ((count / totalResponses) * 100).toFixed(1) : 0;
+                            addText(`- ${label}: ${count} respost${count > 1 ? 'as' : 'a'} (${percentage}%)`, 10);
+                        });
+                    } else {
+                         addText('- Nenhuma resposta para esta pergunta.', 10, false);
+                    }
+                    y += 15;
+                 });
+                 
+                 y += 15;
+                 addText('Comentários e Sugestões', 12, true);
+                 const comments = data.filter(d => d.comentarioSugestao && d.comentarioSugestao.trim() !== '');
+                 if (comments.length > 0) {
+                     comments.forEach(res => {
+                        const commentText = `"${res.comentarioSugestao}" - (${res.nome || 'Anônimo'})`;
+                        addText(doc.splitTextToSize(commentText, pageWidth - margin * 2), 10);
+                        y += 5;
+                     });
+                 } else {
+                    addText('- Nenhum comentário fornecido.', 10);
+                 }
+            }
+
+            doc.save(filename);
         }
         
-        // NOVA FUNÇÃO PARA SETUP DOS BOTÕES DE EXPORTAR PDF
         function setupPdfExport() {
             document.getElementById('export-events-pdf').addEventListener('click', () => {
                 const eventFilter = document.getElementById('event-filter');
-                const eventName = eventFilter.value === 'all' ? 'Todos' : eventFilter.selectedOptions[0].text;
+                const eventName = eventFilter.value === 'all' ? 'Geral de Eventos' : eventFilter.selectedOptions[0].text;
                 const filename = `relatorio_eventos_${eventName.replace(/\s+/g, '_')}.pdf`;
-                const title = `Relatório de Avaliação - Evento: ${eventName}`;
-                exportToPdf('event-dashboard-content', filename, title, 'landscape');
+                const title = `Relatório de Avaliação: ${eventName}`;
+                generatePdfReport('event', currentFilteredEventResponses, title, filename);
             });
             document.getElementById('export-satisfaction-pdf').addEventListener('click', () => {
                 const attendantFilter = document.getElementById('satisfaction-attendant-filter');
-                const attendantName = attendantFilter.value === 'all' ? 'Todos' : attendantFilter.selectedOptions[0].text;
+                const attendantName = attendantFilter.value === 'all' ? 'Geral de Serviços' : attendantFilter.selectedOptions[0].text;
                 const filename = `relatorio_satisfacao_${attendantName.replace(/\s+/g, '_')}.pdf`;
-                const title = `Relatório de Satisfação - Colaborador: ${attendantName}`;
-                exportToPdf('satisfaction-dashboard-content', filename, title, 'landscape');
+                const title = `Relatório de Satisfação: ${attendantName}`;
+                generatePdfReport('satisfaction', currentFilteredSatisfactionResponses, title, filename);
             });
         }
 
@@ -693,7 +750,6 @@
                         fadeOut: { 'from': { opacity: '1' }, 'to': { opacity: '0' } },
                         scaleIn: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
                         fadeInUp: { '0%': { opacity: '0', transform: 'translateY(25px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
-                        // NOVO: Keyframe para animação do gradiente
                         'gradient-flow': {
                             '0%': { 'background-position': '0% 50%' },
                             '50%': { 'background-position': '100% 50%' },
@@ -705,7 +761,6 @@
                         'fade-out': 'fadeOut 0.5s ease-out forwards',
                         'scale-in': 'scaleIn 0.4s ease-out forwards',
                         'fade-in-up': 'fadeInUp 0.8s ease-out forwards',
-                         // NOVO: Animação do gradiente
                         'gradient-flow': 'gradient-flow 15s ease infinite',
                     }
                 }
@@ -713,13 +768,10 @@
         }
     </script>
     
-    <!-- Estilos CSS Personalizados -->
     <style>
         .btn-hover-effect { transition: transform 0.3s ease, box-shadow 0.3s ease; }
         .btn-hover-effect:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2); }
-        .animated-gradient {
-            background-size: 200% 200%;
-        }
+        .animated-gradient { background-size: 200% 200%; }
         #mouse-spotlight {
             position: absolute; inset: 0; width: 100%; height: 100%;
             background: radial-gradient(600px at var(--x) var(--y), rgba(255, 255, 255, 0.15), transparent 80%);
@@ -733,10 +785,8 @@
 </head>
 <body class="bg-gray-100 font-sans text-gray-800">
 
-    <!-- Mensagem de Erro do Firebase -->
     <div id="firebase-error" class="hidden fixed top-0 left-0 w-full bg-red-600 text-white p-4 text-center z-[200]"></div>
 
-    <!-- ECRÃ DE LOGIN (POP-UP) -->
     <div id="login-screen" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 animate-fade-in">
         <div class="w-full max-w-md bg-gradient-to-br from-evereste-green to-evereste-blue rounded-2xl shadow-2xl p-8 text-white animate-scale-in">
             <form id="login-form">
@@ -758,9 +808,7 @@
         </div>
     </div>
 
-    <!-- CONTEÚDO PÚBLICO -->
     <div id="public-content">
-        <!-- ALTERAÇÃO: Adicionada classe 'animated-gradient' e 'animate-gradient-flow' para o fundo animado -->
         <header id="hero-header" class="relative bg-gradient-to-br from-evereste-green to-evereste-blue text-white min-h-screen flex flex-col items-center justify-center p-6 overflow-hidden animated-gradient animate-gradient-flow">
             <div id="mouse-spotlight"></div>
             <div class="absolute top-4 right-4 z-20">
@@ -771,7 +819,6 @@
             </div>
 
             <div class="text-center z-10 animate-scale-in">
-                <!-- ALTERAÇÃO: Logo aumentado de w-48 para w-64 (aprox. 30% maior) -->
                 <svg class="w-64 mx-auto h-auto mb-4" viewBox="0 0 883.63 140.97" xmlns="http://www.w3.org/2000/svg">
                     <defs><style>.cls-1{fill:#fff;fill-rule:evenodd;}</style></defs>
                     <path class="cls-1" d="M200.16,44.25h59.59v-14.58h-59.59c-12.13,0-21.92,9.91-21.92,22.04v37.55c0,12.13,9.8,22.04,21.92,22.04h59.59v-14.58h-59.59c-4.08,0-7.46-3.38-7.46-7.46v-15.39h52.48v-14.58h-52.48v-7.58c0-4.08,3.38-7.46,7.46-7.46h0ZM333.68,29.67l-7.46,14.58-17.84,34.99-17.84-34.99-7.46-14.58h-16.33l7.46,14.58,34.17,67.05,34.17-67.05,7.46-14.58h-16.33ZM374.03,44.25h59.59v-14.58h-59.59c-12.13,0-21.92,9.91-21.92,22.04v37.55c0,12.13,9.8,22.04,21.92,22.04h59.59v-14.58h-59.59c-4.08,0-7.46-3.38-7.46-7.46v-15.39h52.48v-14.58h-52.48v-7.58c0-4.08,3.38-7.46,7.46-7.46h0ZM499.51,73.64h0c2.22-.23,4.31-.82,6.3-1.75,7.58-3.5,12.83-11.2,12.83-20.12,0-6.12-2.45-11.6-6.41-15.68-3.96-3.96-9.45-6.41-15.51-6.41h-51.54v81.63h14.58v-37.43h14.58c5.25,0,9.8,2.78,12.36,6.98l.35.68,7.81,15.24,7.46,14.54h16.33l-7.46-14.54-11.66-23.13h0ZM459.74,59.41v-15.16h36.97c2.57,0,4.31,1.17,5.25,2.12.81.82,2.22,2.7,2.22,5.4,0,2.94-1.75,5.64-4.43,6.82-.93.47-1.98.7-3.03.7l-36.97.12h0ZM552.45,44.25h59.59v-14.58h-59.59c-12.13,0-21.92,9.91-21.92,22.04v37.55c0,12.13,9.8,22.04,21.92,22.04h59.59v-14.58h-59.59c-4.08,0-7.46-3.38-7.46-7.46v-15.39h52.48v-14.58h-52.48v-7.58c0-4.08,3.38-7.46,7.46-7.46h0ZM700.9,52.18v-.47c0-12.13-9.91-22.04-22.04-22.04h-33.12c-12.13,0-21.92,9.91-21.92,22.04v.47c0,4.67,1.4,8.98,3.85,12.48.81,1.28,1.75,2.45,2.8,3.5,3.96,3.85,9.33,6.18,15.28,6.18h29.39c6.18,0,11.31,5.02,11.31,11.19s-5.13,11.2-11.31,11.2h-25.54c-6.18,0-11.2-5.02-11.2-11.2h-14.58c0,14.23,11.55,25.77,25.77,25.77h25.54c14.23,0,25.77-11.55,25.77-25.77,0-6.18-2.22-11.9-5.83-16.33-.35-.35-.58-.7-.93-1.05-4.67-5.13-11.43-8.4-19.01-8.4h-29.39c-4.08,0-7.46-3.38-7.46-7.46v-.47c0-4.08,3.38-7.46,7.46-7.46h33.12c4.08,0,7.46,3.38,7.46,7.46v.47l14.58-.12h0ZM708.71,29.67v14.58h33.47v67.05h14.58V44.25h33.47v-14.58h-81.51ZM824.04,44.25h59.59v-14.58h-59.59c-12.13,0-21.92,9.91-21.92,22.04v37.55c0,12.13,9.8,22.04,21.92,22.04h59.59v-14.58h-59.59c-4.08,0-7.46-3.38-7.46-7.46v-15.39h52.48v-14.58h-52.48v-7.58c0-4.08,3.38-7.46,7.46-7.46Z"/>
@@ -815,7 +862,6 @@
         </footer>
     </div>
     
-    <!-- CONTEÚDO DO ADMINISTRADOR (INICIALMENTE OCULTO) -->
     <div id="admin-content" class="hidden bg-gradient-to-br from-gray-50 to-gray-200 min-h-screen">
          <div class="fixed top-4 right-4 z-40">
             <button id="logout-btn" class="bg-white/80 backdrop-blur-sm text-gray-700 font-bold py-2 px-4 rounded-full shadow-lg hover:bg-white transition-colors flex items-center gap-2">
@@ -831,7 +877,6 @@
 
         <main class="pb-16 md:pb-24 px-4 sm:px-6">
             <div class="max-w-7xl mx-auto space-y-12 mt-12">
-                <!-- Seção de Eventos -->
                 <div id="event-dashboard-content" class="bg-white text-gray-800 p-4 sm:p-8 rounded-2xl shadow-lg">
                     <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                         <div>
@@ -865,7 +910,6 @@
                             </button>
                         </form>
                         <ul id="admin-event-list" class="space-y-2 max-h-48 overflow-y-auto">
-                            <!-- Lista de eventos será populada aqui -->
                         </ul>
                     </div>
 
@@ -879,7 +923,6 @@
                             <div class="h-64 md:h-72"><canvas id="event-recommend-chart"></canvas></div>
                         </div>
 
-                        <!-- NOVA SEÇÃO DE INFRAESTRUTURA -->
                         <div class="mt-10 pt-6 border-t border-gray-200">
                             <h4 class="text-xl font-bold text-center text-gray-700 mb-6">Avaliação da Infraestrutura</h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -895,7 +938,7 @@
                         </div>
                     </div>
                 </div>
-                <!-- Seção de Satisfação -->
+
                 <div id="satisfaction-dashboard-content" class="bg-white text-gray-800 p-4 sm:p-8 rounded-2xl shadow-lg">
                     <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                         <div>
@@ -931,7 +974,6 @@
                     <div class="mt-12">
                         <h4 class="text-xl font-bold text-gray-700 mb-4">Comentários e Sugestões</h4>
                         <ul id="satisfaction-comments-list" class="space-y-4 max-h-96 overflow-y-auto p-2">
-                            <!-- Os comentários serão inseridos aqui pelo JavaScript -->
                         </ul>
                     </div>
                 </div>
@@ -959,7 +1001,6 @@
                         <label for="event-attended-select" class="block text-sm font-bold text-gray-700 mb-1">Qual evento participou?</label>
                         <select name="evento_participado" id="event-attended-select" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-evereste-green focus:border-evereste-green bg-white">
                             <option value="" disabled selected>Selecione o evento</option>
-                            <!-- Opções de evento serão populadas aqui -->
                         </select>
                     </div>
                     <fieldset>
@@ -1016,7 +1057,6 @@
                         </div>
                     </fieldset>
                     
-                    <!-- NOVAS PERGUNTAS DE INFRAESTRUTURA -->
                      <div class="pt-4 mt-4 border-t border-gray-200">
                         <h3 class="text-md font-bold text-gray-800 mb-4">Sobre a Infraestrutura (para eventos online/híbridos)</h3>
                         <div class="space-y-6">
@@ -1192,7 +1232,6 @@
         </div>
     </div>
 
-    <!-- MODAL DE SUCESSO PÓS-ENVIO -->
     <div id="success-modal" class="hidden fixed inset-0 bg-black/70 z-[110] flex items-center justify-center p-4 animate-fade-in">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md text-center p-8 animate-scale-in">
             <div class="w-24 h-24 mx-auto mb-4 flex items-center justify-center bg-evereste-green/10 rounded-full">
@@ -1211,14 +1250,12 @@
     </div>
 
     <script>
-        // Este script final inicializa os ícones e o efeito de spotlight.
         document.addEventListener('DOMContentLoaded', function () {
             feather.replace();
             
             const heroHeader = document.getElementById('hero-header');
             if(heroHeader){
                 heroHeader.addEventListener('mousemove', e => {
-                    // Atualiza as variáveis CSS para o efeito de gradiente radial seguir o mouse.
                     const rect = heroHeader.getBoundingClientRect();
                     heroHeader.style.setProperty('--x', (e.clientX - rect.left) + 'px');
                     heroHeader.style.setProperty('--y', (e.clientY - rect.top) + 'px');
@@ -1228,3 +1265,4 @@
     </script>
 </body>
 </html>
+
