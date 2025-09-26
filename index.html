@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="pt-br" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
@@ -22,6 +21,10 @@
 
     <!-- Ícones (Feather Icons) -->
     <script src="https://unpkg.com/feather-icons"></script>
+    
+    <!-- jsPDF e html2canvas para exportação em PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Firebase SDKs -->
     <script type="module">
@@ -93,7 +96,7 @@
                     modal.classList.add('hidden');
                     modal.classList.remove('animate-fade-out');
                 }, 500);
-            }, 3000);
+            }, 4000); // Aumentado o tempo para dar tempo de ler "Gerando PDF..."
         }
 
         function showSuccessModal() {
@@ -140,11 +143,11 @@
             setupEventDashboard(db);
             setupSatisfactionDashboard(db);
             setupCsvExport();
+            setupPdfExport(); // NOVO: Inicializa a exportação em PDF
             areDashboardsInitialized = true;
         }
 
         function setupEventDashboard(db) {
-            const eventCollectionRef = collection(db, "event-evals");
             const eventFilter = document.getElementById('event-filter');
             let isFilterListenerAttached = false;
 
@@ -154,8 +157,16 @@
                 updateChart(eventCharts, 'event-satisfaction-chart', 'doughnut', 'Nível de Satisfação Geral', processRadioData(responses, 'satisfacao_geral'));
                 updateChart(eventCharts, 'event-organization-chart', 'pie', 'Avaliação da Organização', processRadioData(responses, 'organizacao'));
                 updateChart(eventCharts, 'event-speakers-chart', 'pie', 'Qualidade dos Palestrantes', processRadioData(responses, 'palestrantes'));
-                updateChart(eventCharts, 'event-content-chart', 'pie', 'Qualidade do Conteúdo', processRadioData(responses, 'instalacoes'));
+                updateChart(eventCharts, 'event-content-chart', 'pie', 'Qualidade do Conteúdo', processRadioData(responses, 'conteudo'));
+                updateChart(eventCharts, 'event-facilities-chart', 'pie', 'Qualidade das Instalações', processRadioData(responses, 'instalacoes'));
                 updateChart(eventCharts, 'event-recommend-chart', 'doughnut', 'Recomendaria o Evento?', processRadioData(responses, 'recomendaria'));
+                
+                // NOVOS GRÁFICOS DE INFRAESTRUTURA
+                updateChart(eventCharts, 'event-transmission-chart', 'pie', 'Qualidade da Transmissão', processRadioData(responses, 'transmissao'));
+                updateChart(eventCharts, 'event-audio-video-chart', 'pie', 'Qualidade de Áudio e Vídeo', processRadioData(responses, 'audio_video'));
+                updateChart(eventCharts, 'event-connection-chart', 'pie', 'Qualidade da Conexão', processRadioData(responses, 'conexao'));
+                updateChart(eventCharts, 'event-lighting-chart', 'pie', 'Qualidade da Iluminação', processRadioData(responses, 'iluminacao'));
+
                 updateChart(eventCharts, 'event-nps-chart', 'bar', 'NPS do Evento', processNPSData(responses, 'npsEvento'));
             };
 
@@ -373,6 +384,11 @@
                         palestrantes: eventForm.elements['palestrantes'].value,
                         conteudo: eventForm.elements['conteudo'].value,
                         instalacoes: eventForm.elements['instalacoes'].value,
+                        // NOVOS CAMPOS DE INFRAESTRUTURA
+                        transmissao: eventForm.elements['transmissao'].value,
+                        audio_video: eventForm.elements['audio_video'].value,
+                        conexao: eventForm.elements['conexao'].value,
+                        iluminacao: eventForm.elements['iluminacao'].value,
                         recomendaria: eventForm.elements['recomendaria'].value,
                         npsEvento: eventForm.elements['npsEvento'].value,
                         timestamp: new Date()
@@ -469,7 +485,7 @@
             });
         }
         
-        // --- 8. NOVAS FUNÇÕES DE ADMINISTRAÇÃO ---
+        // --- 8. FUNÇÕES DE ADMINISTRAÇÃO ---
         
         function populateEventDropdown(db) {
             const eventsCollectionRef = collection(db, "events");
@@ -549,7 +565,7 @@
             });
         }
 
-        // --- 9. LÓGICA DE EXPORTAÇÃO CSV ---
+        // --- 9. LÓGICA DE EXPORTAÇÃO (CSV E PDF) ---
         function exportToCsv(filename, rows) {
             if (!rows || rows.length === 0) {
                 showNotification("Não há dados para exportar.", false);
@@ -585,6 +601,84 @@
             });
         }
 
+        // NOVA FUNÇÃO PARA EXPORTAR PDF
+        function exportToPdf(elementId, filename, title, orientation = 'p') {
+            const { jsPDF } = window.jspdf;
+            const targetElement = document.getElementById(elementId);
+            if (!targetElement) {
+                showNotification("Elemento do relatório não encontrado.", false);
+                return;
+            }
+
+            showNotification("Gerando PDF, por favor aguarde...", true);
+            const originalBackgroundColor = targetElement.style.backgroundColor;
+            targetElement.style.backgroundColor = '#FFFFFF';
+
+            html2canvas(targetElement, {
+                scale: 2, // Aumenta a resolução da imagem
+                useCORS: true,
+                logging: true,
+                windowWidth: targetElement.scrollWidth,
+                windowHeight: targetElement.scrollHeight
+            }).then(canvas => {
+                targetElement.style.backgroundColor = originalBackgroundColor;
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({
+                    orientation: orientation,
+                    unit: 'pt',
+                    format: 'a4'
+                });
+
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                const margin = 40;
+                
+                const imgProps= pdf.getImageProperties(imgData);
+                const imgWidth = pdfWidth - margin * 2;
+                const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+                let heightLeft = imgHeight;
+                let position = margin;
+
+                pdf.setFontSize(20);
+                pdf.text(title, pdfWidth / 2, position, { align: 'center' });
+                position = margin + 30; // Move position down for the image
+
+                pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+                heightLeft -= (pdfHeight - margin * 2 - 30);
+
+                while (heightLeft > 0) {
+                    position = -heightLeft + margin;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+                    heightLeft -= (pdfHeight - margin);
+                }
+
+                pdf.save(filename);
+            }).catch(err => {
+                targetElement.style.backgroundColor = originalBackgroundColor;
+                console.error("Erro ao gerar PDF:", err);
+                showNotification("Ocorreu um erro ao gerar o PDF.", false);
+            });
+        }
+        
+        // NOVA FUNÇÃO PARA SETUP DOS BOTÕES DE EXPORTAR PDF
+        function setupPdfExport() {
+            document.getElementById('export-events-pdf').addEventListener('click', () => {
+                const eventFilter = document.getElementById('event-filter');
+                const eventName = eventFilter.value === 'all' ? 'Todos' : eventFilter.selectedOptions[0].text;
+                const filename = `relatorio_eventos_${eventName.replace(/\s+/g, '_')}.pdf`;
+                const title = `Relatório de Avaliação - Evento: ${eventName}`;
+                exportToPdf('event-dashboard-content', filename, title, 'landscape');
+            });
+            document.getElementById('export-satisfaction-pdf').addEventListener('click', () => {
+                const attendantFilter = document.getElementById('satisfaction-attendant-filter');
+                const attendantName = attendantFilter.value === 'all' ? 'Todos' : attendantFilter.selectedOptions[0].text;
+                const filename = `relatorio_satisfacao_${attendantName.replace(/\s+/g, '_')}.pdf`;
+                const title = `Relatório de Satisfação - Colaborador: ${attendantName}`;
+                exportToPdf('satisfaction-dashboard-content', filename, title, 'landscape');
+            });
+        }
+
     </script>
 
     <!-- Configuração de Estilos e Cores do Tailwind -->
@@ -599,12 +693,20 @@
                         fadeOut: { 'from': { opacity: '1' }, 'to': { opacity: '0' } },
                         scaleIn: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
                         fadeInUp: { '0%': { opacity: '0', transform: 'translateY(25px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+                        // NOVO: Keyframe para animação do gradiente
+                        'gradient-flow': {
+                            '0%': { 'background-position': '0% 50%' },
+                            '50%': { 'background-position': '100% 50%' },
+                            '100%': { 'background-position': '0% 50%' },
+                        }
                     },
                     animation: {
                         'fade-in': 'fadeIn 0.4s ease-out forwards',
                         'fade-out': 'fadeOut 0.5s ease-out forwards',
                         'scale-in': 'scaleIn 0.4s ease-out forwards',
                         'fade-in-up': 'fadeInUp 0.8s ease-out forwards',
+                         // NOVO: Animação do gradiente
+                        'gradient-flow': 'gradient-flow 15s ease infinite',
                     }
                 }
             }
@@ -615,6 +717,9 @@
     <style>
         .btn-hover-effect { transition: transform 0.3s ease, box-shadow 0.3s ease; }
         .btn-hover-effect:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2); }
+        .animated-gradient {
+            background-size: 200% 200%;
+        }
         #mouse-spotlight {
             position: absolute; inset: 0; width: 100%; height: 100%;
             background: radial-gradient(600px at var(--x) var(--y), rgba(255, 255, 255, 0.15), transparent 80%);
@@ -655,7 +760,8 @@
 
     <!-- CONTEÚDO PÚBLICO -->
     <div id="public-content">
-        <header id="hero-header" class="relative bg-gradient-to-br from-evereste-green to-evereste-blue text-white min-h-screen flex flex-col items-center justify-center p-6 overflow-hidden">
+        <!-- ALTERAÇÃO: Adicionada classe 'animated-gradient' e 'animate-gradient-flow' para o fundo animado -->
+        <header id="hero-header" class="relative bg-gradient-to-br from-evereste-green to-evereste-blue text-white min-h-screen flex flex-col items-center justify-center p-6 overflow-hidden animated-gradient animate-gradient-flow">
             <div id="mouse-spotlight"></div>
             <div class="absolute top-4 right-4 z-20">
                 <a href="#" id="open-login-btn" class="bg-white/20 backdrop-blur-sm text-white font-bold py-2 px-4 rounded-full shadow-lg hover:bg-white/30 transition-colors flex items-center gap-2">
@@ -665,7 +771,8 @@
             </div>
 
             <div class="text-center z-10 animate-scale-in">
-                <svg class="w-48 mx-auto h-auto mb-4" viewBox="0 0 883.63 140.97" xmlns="http://www.w3.org/2000/svg">
+                <!-- ALTERAÇÃO: Logo aumentado de w-48 para w-64 (aprox. 30% maior) -->
+                <svg class="w-64 mx-auto h-auto mb-4" viewBox="0 0 883.63 140.97" xmlns="http://www.w3.org/2000/svg">
                     <defs><style>.cls-1{fill:#fff;fill-rule:evenodd;}</style></defs>
                     <path class="cls-1" d="M200.16,44.25h59.59v-14.58h-59.59c-12.13,0-21.92,9.91-21.92,22.04v37.55c0,12.13,9.8,22.04,21.92,22.04h59.59v-14.58h-59.59c-4.08,0-7.46-3.38-7.46-7.46v-15.39h52.48v-14.58h-52.48v-7.58c0-4.08,3.38-7.46,7.46-7.46h0ZM333.68,29.67l-7.46,14.58-17.84,34.99-17.84-34.99-7.46-14.58h-16.33l7.46,14.58,34.17,67.05,34.17-67.05,7.46-14.58h-16.33ZM374.03,44.25h59.59v-14.58h-59.59c-12.13,0-21.92,9.91-21.92,22.04v37.55c0,12.13,9.8,22.04,21.92,22.04h59.59v-14.58h-59.59c-4.08,0-7.46-3.38-7.46-7.46v-15.39h52.48v-14.58h-52.48v-7.58c0-4.08,3.38-7.46,7.46-7.46h0ZM499.51,73.64h0c2.22-.23,4.31-.82,6.3-1.75,7.58-3.5,12.83-11.2,12.83-20.12,0-6.12-2.45-11.6-6.41-15.68-3.96-3.96-9.45-6.41-15.51-6.41h-51.54v81.63h14.58v-37.43h14.58c5.25,0,9.8,2.78,12.36,6.98l.35.68,7.81,15.24,7.46,14.54h16.33l-7.46-14.54-11.66-23.13h0ZM459.74,59.41v-15.16h36.97c2.57,0,4.31,1.17,5.25,2.12.81.82,2.22,2.7,2.22,5.4,0,2.94-1.75,5.64-4.43,6.82-.93.47-1.98.7-3.03.7l-36.97.12h0ZM552.45,44.25h59.59v-14.58h-59.59c-12.13,0-21.92,9.91-21.92,22.04v37.55c0,12.13,9.8,22.04,21.92,22.04h59.59v-14.58h-59.59c-4.08,0-7.46-3.38-7.46-7.46v-15.39h52.48v-14.58h-52.48v-7.58c0-4.08,3.38-7.46,7.46-7.46h0ZM700.9,52.18v-.47c0-12.13-9.91-22.04-22.04-22.04h-33.12c-12.13,0-21.92,9.91-21.92,22.04v.47c0,4.67,1.4,8.98,3.85,12.48.81,1.28,1.75,2.45,2.8,3.5,3.96,3.85,9.33,6.18,15.28,6.18h29.39c6.18,0,11.31,5.02,11.31,11.19s-5.13,11.2-11.31,11.2h-25.54c-6.18,0-11.2-5.02-11.2-11.2h-14.58c0,14.23,11.55,25.77,25.77,25.77h25.54c14.23,0,25.77-11.55,25.77-25.77,0-6.18-2.22-11.9-5.83-16.33-.35-.35-.58-.7-.93-1.05-4.67-5.13-11.43-8.4-19.01-8.4h-29.39c-4.08,0-7.46-3.38-7.46-7.46v-.47c0-4.08,3.38-7.46,7.46-7.46h33.12c4.08,0,7.46,3.38,7.46,7.46v.47l14.58-.12h0ZM708.71,29.67v14.58h33.47v67.05h14.58V44.25h33.47v-14.58h-81.51ZM824.04,44.25h59.59v-14.58h-59.59c-12.13,0-21.92,9.91-21.92,22.04v37.55c0,12.13,9.8,22.04,21.92,22.04h59.59v-14.58h-59.59c-4.08,0-7.46-3.38-7.46-7.46v-15.39h52.48v-14.58h-52.48v-7.58c0-4.08,3.38-7.46,7.46-7.46Z"/>
                     <path class="cls-1" d="M79.38,67.15l-17.84-18.63-9.07,22.68-4.65-9.11-26.01,44.06c1.07,1.59,2.2,3.14,3.41,4.63.24.3.48.59.73.89.25.29.49.59.74.87.25.29.5.58.76.86.26.28.51.57.77.85.26.28.52.56.79.83.27.28.53.55.8.82.27.27.54.54.82.8.28.27.55.53.83.79.28.26.56.52.85.78.28.26.57.51.86.76.29.25.58.5.87.74.29.25.59.49.89.73.3.24.6.48.9.71.3.24.61.47.91.7.31.23.61.46.93.68.31.22.62.45.94.67.32.22.63.44.95.65.32.21.64.42.96.63.32.21.65.41.98.62.33.2.66.4.99.6.33.2.66.39,1,.58.33.19.67.38,1.01.56.34.18.68.37,1.02.55.34.18.69.36,1.03.53.35.17.69.34,1.04.51.35.17.7.33,1.05.49.35.16.71.32,1.06.47.36.15.71.31,1.07.45.36.15.72.29,1.08.44.36.14.73.28,1.09.42.37.14.73.27,1.1.4.37.13.74.25,1.11.38.37.12.75.24,1.12.36.38.12.75.23,1.13.34.38.11.76.21,1.14.32.38.1.76.2,1.15.3.38.1.77.19,1.15.28.39.09.77.17,1.16.26.39.08.78.16,1.17.23.39.08.78.15,1.18.21.39.07.79.13,1.18.19.4.06.79.12,1.19.17.4.05.8.1,1.2.15.4.05.8.09,1.21.13.4.04.81.07,1.21.1.41.03.81.06,1.22.08.41.02.82.04,1.22.06.41.02.82.03,1.23.03.41,0,.82.01,1.23.01.37,0,.75,0,1.12,0h0c.38,0,.75-.01,1.12-.03h.02c.36-.01.72-.03,1.08-.05h.02c.36-.02.72-.04,1.09-.07h.06c.35-.03.71-.05,1.06-.09h.03c.36-.04.71-.07,1.07-.1h.03c.35-.04.71-.08,1.06-.12h.04c.36-.05.71-.09,1.07-.14h.01c.36-.05.71-.1,1.07-.16h0c.16-.03.32-.05.48-.08l.27-.04.33-.06.26-.05.33-.06.22-.04.31-.06c.17-.03.33-.06.5-.1h.03c1.66-.34,3.3-.73,4.93-1.2l.43-.12.26-.08.22-.07.34-.1.32-.1c.22-.07.44-.14.65-.21.22-.07.45-.15.67-.22h0c2.07-.72,4.13-1.51,6.12-2.43l.13-.06c.26-.12.52-.24.78-.37l.07-.03c.22-.11.45-.21.67-.32l.16-.08c.22-.11.45-.22.67-.34l.06-.03c.25-.13.5-.26.75-.39l.15-.08c.2-.11.41-.22.61-.33l.13-.07c.25-.14.5-.28.75-.42l.07-.04c.21-.12.43-.24.64-.37l.16-.09c.23-.14.46-.27.7-.41h0c.24-.15.48-.3.72-.44l.15-.09c.19-.12.38-.24.57-.36l.14-.09.33-.21c-.19-.67-.29-1.38-.29-2.11,0-4.25,3.44-7.69,7.69-7.69s7.69,3.44,7.69,7.69-3.44,7.69-7.69,7.69c-1.21,0-2.36-.28-3.37-.78-.19.13-.38.26-.57.38l-.15.1c-.26.17-.52.34-.79.5l-.13.08c-.27.17-.53.33-.8.5l-.14.09c-.27.16-.53.32-.8.48l-.15.09c-.27.16-.53.31-.8.46l-.16.09c-.08.05-.16.09-.24.14,0,0-.02.01-.03.02-4.58,2.38-9.39,4.29-14.34,5.75-4.65,1.37-9.41,2.35-14.22,2.92-.01,0-.02,0-.04,0-.36.03-.72.05-1.08.08-.38.02-.77.05-1.15.07-.19,0-.38.02-.58.03-.19,0-.39.01-.58.02-.19,0-.39.01-.58.02-.19,0-.39,0-.58.01-.19,0-.39,0-.58,0-.2,0-.39,0-.59,0h-.41c-.83,0-1.66-.02-2.5-.06h-.08c-.22-.02-.45-.03-.67-.04-.29-.01-.58-.03-.87-.05-.22-.01-.45-.03-.67-.05-.28-.02-.55-.04-.83-.06-.23-.02-.46-.04-.7-.07-.27-.03-.53-.05-.8-.08-.23-.03-.47-.05-.7-.08-.26-.03-.52-.06-.78-.09-.24-.03-.47-.06-.7-.1-.26-.04-.52-.07-.77-.11-.23-.03-.47-.07-.7-.11-.26-.04-.51-.08-.77-.12-.23-.04-.46-.08-.69-.12-.26-.05-.52-.09-.77-.14-.23-.04-.45-.09-.68-.13-.25-.05-.51-.1-.76-.16-.23-.05-.46-.1-.69-.15-.25-.06-.49-.11-.74-.17-.23-.05-.46-.11-.69-.17-.24-.06-.49-.12-.73-.19-.23-.06-.46-.12-.69-.18-.24-.07-.48-.13-.72-.2-.23-.06-.45-.13-.68-.2-.24-.07-.48-.14-.72-.21-.22-.07-.45-.14-.67-.21-.24-.08-.48-.15-.72-.23-.22-.07-.44-.15-.66-.22-.24-.08-.47-.16-.71-.24-.22-.08-.44-.16-.66-.23-.24-.09-.47-.17-.7-.26-.22-.08-.44-.16-.65-.25-.23-.09-.47-.18-.7-.28-.21-.08-.42-.17-.63-.25-.24-.1-.47-.19-.7-.29-.21-.09-.42-.18-.63-.27-.23-.1-.45-.2-.68-.3-.21-.09-.42-.19-.63-.28-.23-.11-.46-.21-.69-.32-.2-.09-.41-.19-.61-.29-.23-.11-.46-.23-.7-.34-.2-.1-.39-.19-.59-.29-.24-.12-.47-.24-.7-.36-.19-.1-.38-.2-.57-.3-.23-.12-.46-.25-.69-.38-.19-.1-.38-.21-.57-.31-.23-.13-.45-.26-.68-.39-.18-.11-.37-.21-.56-.32-.23-.14-.46-.28-.69-.42-.18-.11-.35-.21-.53-.32-.24-.15-.47-.29-.71-.44-.17-.11-.33-.21-.5-.32-.25-.16-.49-.32-.73-.48-.15-.1-.31-.2-.46-.3-.27-.18-.54-.37-.8-.55-.12-.09-.25-.17-.37-.25-.3-.21-.59-.42-.89-.64-.09-.07-.18-.13-.27-.2-.77-.56-1.53-1.14-2.27-1.73-.07-.06-.15-.12-.22-.18-.3-.24-.59-.47-.88-.72-.12-.1-.23-.19-.35-.29-.25-.21-.5-.42-.74-.63-.13-.11-.25-.22-.38-.34-.23-.2-.46-.4-.68-.6-.14-.12-.27-.25-.41-.37-.22-.2-.43-.39-.64-.59-.14-.13-.28-.26-.41-.39-.2-.19-.41-.39-.61-.58-.15-.14-.29-.29-.43-.43-.19-.19-.38-.38-.57-.57-.14-.15-.29-.29-.43-.44-.19-.19-.38-.39-.56-.58-.14-.15-.27-.29-.41-.44-.19-.2-.38-.4-.56-.61-.13-.15-.26-.29-.4-.44-.18-.2-.37-.41-.55-.62-.13-.15-.27-.31-.4-.46-.18-.2-.35-.41-.52-.62-.13-.16-.26-.32-.39-.47-.17-.21-.34-.42-.51-.62-.13-.16-.26-.33-.39-.49-.16-.21-.33-.42-.49-.62-.13-.17-.26-.34-.39-.51-.16-.21-.32-.42-.47-.63-.13-.17-.25-.34-.37-.51-.16-.22-.31-.43-.47-.65-.12-.17-.24-.34-.36-.52-.15-.22-.3-.43-.45-.65-.12-.18-.24-.35-.35-.53-.15-.22-.29-.44-.44-.67-.11-.18-.23-.35-.34-.53-.14-.22-.28-.45-.42-.67-.11-.18-.22-.36-.34-.54-.14-.22-.27-.45-.41-.68-.11-.18-.22-.37-.32-.55-.13-.23-.27-.46-.4-.69-.1-.18-.21-.37-.31-.55-.13-.23-.26-.47-.38-.7-.1-.19-.2-.37-.3-.56-.13-.24-.25-.47-.37-.71-.1-.19-.19-.37-.29-.56-.12-.24-.24-.49-.36-.74-.09-.18-.18-.37-.27-.55-.12-.25-.24-.5-.35-.75-.09-.19-.17-.37-.26-.56-.11-.25-.22-.5-.33-.75-.08-.19-.17-.38-.25-.57-.11-.25-.21-.5-.31-.75-.08-.19-.16-.39-.24-.58-.1-.26-.2-.52-.31-.78-.07-.19-.15-.38-.22-.57-.1-.27-.2-.54-.3-.81-.07-.18-.14-.36-.2-.55-.1-.28-.2-.56-.29-.84-.06-.18-.12-.35-.18-.53-.1-.3-.19-.59-.29-.89-.05-.17-.11-.33-.16-.5-.1-.32-.2-.65-.29-.98-.04-.14-.09-.28-.13-.42-.06-.2-.11-.39-.16-.59-.1-.37,0-.74.29-1,4.82-4.34,9.58-8.74,14.29-13.21l.83-.78.79-.75.79-.75.9-.86.85-.82.73-.7.8-.77.78-.75.96-.92,1.38-1.33,1.33-1.28,1.29-1.25,1.28-1.25c8.03-7.82,16.02-15.68,24.01-23.54l2.35-2.31c.2-.19.43-.29.71-.28.27,0,.51.11.7.3l2.27,2.37,20.55,21.45,3.07-3.11,1.2-1.21,4.4-4.46,4.81-4.88c.38-.39,1-.39,1.39-.01l2.71,2.63,2.7,2.63,3.31,3.21,1.85,1.79,1.38,1.33,1.71,1.65c3.37,3.25,6.74,6.49,10.12,9.72,2.89,2.76,5.78,5.52,8.69,8.27l1.12,1.05,4.69,4.43.72-5.9.04-.37.03-.24.04-.36c.24-2.22.35-4.44.35-6.67,0-1.62-.06-3.23-.18-4.84v-.18c-.05-.49-.09-.98-.14-1.47l-.02-.17c-.05-.49-.1-.98-.17-1.47l-.02-.14c-.07-.5-.13-1-.21-1.51v-.06c-.09-.5-.17-1.01-.26-1.51h0c-.09-.5-.19-1-.28-1.49l-.03-.13c-.1-.48-.2-.95-.31-1.43l-.04-.17c-.11-.46-.22-.93-.34-1.39l-.05-.19c-.12-.46-.24-.92-.37-1.38l-.05-.16c-.13-.47-.27-.93-.42-1.4l-.03-.1c-.3-.95-.62-1.9-.96-2.84l-.03-.08c-.16-.45-.33-.89-.51-1.34l-.07-.18c-.17-.43-.35-.86-.53-1.29l-.08-.18c-.18-.43-.36-.85-.56-1.27l-.08-.19c-.19-.42-.38-.84-.59-1.25l-.08-.16c-.21-.42-.41-.85-.63-1.27l-.05-.09c-.22-.42-.44-.84-.66-1.26l-.02-.04c-.23-.42-.46-.84-.7-1.25l-.08-.14c-.23-.4-.47-.8-.71-1.19l-.1-.17c-.24-.39-.48-.77-.72-1.16l-.12-.19c-.24-.38-.49-.76-.74-1.13l-.12-.17c-.26-.38-.52-.76-.79-1.13l-.09-.12c-.28-.39-.56-.78-.85-1.16l-.02-.03c-.28-.38-.57-.75-.86-1.13l-.06-.08c-.29-.37-.58-.73-.88-1.09l-.12-.15c-.29-.35-.58-.7-.88-1.04l-.14-.16c-.29-.34-.59-.68-.89-1.01l-.15-.16c-.31-.34-.61-.67-.93-1l-.12-.13c-.32-.34-.65-.68-.98-1.01l-.06-.06c-.34-.33-.68-.66-1.02-.99l-.02-.02c-.35-.34-.71-.66-1.06-.99l-.1-.09c-.34-.31-.69-.62-1.04-.93l-.14-.12c-.34-.3-.69-.59-1.05-.89l-.16-.13c-2.72-2.25-5.63-4.25-8.68-6.01-1.31,1.04-2.97,1.67-4.78,1.67-4.08,0-7.42-3.18-7.67-7.2l-.22-.07h-.02c-.21-.07-.43-.14-.65-.21h-.03c-.2-.07-.41-.13-.61-.19h-.04c-.2-.07-.41-.13-.61-.19l-.07-.02c-.2-.06-.4-.11-.6-.17l-.06-.02c-.2-.05-.4-.11-.6-.16l-.07-.02c-.2-.05-.41-.1-.61-.15h-.05c-.21-.07-.42-.12-.63-.17h-.05c-.21-.06-.42-.11-.62-.16l-.1-.02c-.2-.04-.4-.09-.6-.13l-.08-.02c-.2-.04-.39-.08-.59-.12l-.09-.02c-.19-.04-.38-.08-.57-.11l-.12-.02c-.2-.04-.39-.07-.59-.11h-.07c-.2-.05-.39-.08-.59-.11l-.12-.02c-.19-.03-.38-.06-.57-.09l-.1-.02c-.2-.03-.39-.06-.59-.09l-.11-.02c-.21-.03-.41-.06-.62-.09h-.04c-.22-.03-.43-.06-.65-.09h-.08c-.22-.04-.43-.06-.65-.09h-.07c-.22-.03-.43-.05-.65-.08h-.05c-.21-.03-.43-.05-.64-.07h-.09c-.21-.03-.41-.04-.62-.06h-.07c-.21-.02-.42-.04-.63-.05h-.1c-.21-.02-.41-.03-.62-.04h-.09c-.21-.02-.41-.03-.62-.04h-.08c-.21-.01-.42-.02-.63-.03h-.08c-.22,0-.44-.02-.66-.02h-.04c-.23,0-.46,0-.69-.01h-.02c-.24,0-.48,0-.72,0-.53,0-1.05,0-1.58.02h-.05c-.53.01-1.07.03-1.6.06h-.03c-.53.03-1.05.06-1.58.1h-.03c-.53.04-1.05.09-1.58.14h-.02c-.52.05-1.03.11-1.55.18h-.04c-.51.07-1.02.14-1.53.21h-.04c-.5.08-1,.16-1.5.25h-.05c-.5.1-1,.19-1.5.29h-.05c-.49.11-.99.21-1.48.32h-.04c-.5.12-.99.24-1.48.36h-.05c-.41.11-.81.22-1.22.33l-.08.02c-.4.11-.81.22-1.21.34l-.08.02c-.38.11-.76.23-1.14.35l-.09.03c-.4.13-.79.26-1.19.39l-.08.03c-.37.13-.75.26-1.12.4l-.08.03c-.39.14-.78.29-1.17.44l-.06.02c-.37.14-.74.29-1.11.44l-.08.03c-.38.16-.76.32-1.14.48l-.07.03c-.36.16-.72.32-1.08.48l-.08.04c-.38.17-.75.35-1.12.53l-.07.03c-.36.17-.71.35-1.06.53l-.06.03c-.37.19-.74.38-1.1.58l-.04.02c-.35.19-.7.38-1.05.57l-.07.04c-.36.2-.72.41-1.08.62l-.03.02c-.35.2-.69.41-1.04.62l-.06.04c-.35.21-.7.43-1.04.66l-.06.04c-.33.21-.66.43-.99.65l-.05.03c-.34.23-.69.46-1.02.7l-.06.04c-.32.23-.64.46-.96.69l-.06.04c-.33.24-.66.48-.98.73l-.06.04c-.31.24-.62.48-.93.73l-.06.04c-.32.25-.64.51-.96.77l-.04.03c-.31.25-.61.51-.91.77l-.06.05c-.31.27-.62.53-.92.81l-.05.04c-.29.26-.58.52-.87.79l-.06.05c-1.89,1.75-3.66,3.62-5.33,5.58l-.04.05c-.32.38-.64.77-.96,1.16l-.04.05c-.15.19-.3.37-.44.56l-.02.02c-.16.2-.31.4-.47.61l-.03.04c-.13.18-.27.36-.4.53l-.06.09c-.29.39-.58.79-.87,1.19l-.06.09c-.12.18-.25.35-.37.53l-.05.07c-.28.41-.56.82-.83,1.23l-.06.09c-.12.18-.24.36-.35.55l-.04.06c-.13.21-.26.41-.39.62l-.07.11c-.1.17-.21.33-.31.5l-.08.13c-.12.2-.25.41-.37.61l-.05.08c-.11.18-.21.37-.32.55l-.07.13c-.1.18-.21.36-.31.54l-.04.07c-.12.22-.24.44-.36.66l-.05.1c-.1.18-.19.36-.29.54l-.06.12c-.11.21-.21.41-.32.62h0c-.12.23-.23.46-.34.69l-.05.09c-.09.19-.18.37-.27.56l-.06.12c-.21.44-.42.89-.62,1.33l-.05.11c-.09.21-.19.42-.28.63l-.02.04c-.1.23-.2.47-.3.7l-.03.07c-.08.2-.17.4-.25.6l-.05.12c-.19.46-.37.92-.54,1.38l-.04.11c-.08.2-.15.4-.22.61l-.03.08c-.09.24-.17.48-.26.72h0c-.08.24-.16.47-.24.7l-.04.11c-.16.48-.32.96-.46,1.44l-.02.07c-.07.22-.13.44-.2.65l-.02.08c-.15.49-.28.98-.41,1.48l-.02.08c-.06.24-.12.47-.19.71h0c-.07.27-.13.53-.2.8h0c-.06.25-.11.49-.17.74l-.02.08c-.11.51-.22,1.01-.33,1.52v.06c-.06.24-.11.48-.15.72v.04c-.11.52-.2,1.04-.28,1.56v.07c-.08.45-.15.89-.21,1.34,2.25,1.34,3.76,3.8,3.76,6.61,0,4.25-3.44,7.69-7.69,7.69s-7.69-3.44-7.69-7.69c0-3.46,2.29-6.39,5.43-7.35.12-.87.26-1.74.41-2.61.07-.39.14-.78.22-1.17h0c1.84-9.42,5.57-18.37,10.99-26.29C27.18,15.93,42.57,5.48,60.08,1.64c.32-.07.64-.14.96-.2h.01c.57-.12,1.14-.23,1.72-.33,2.33-.42,4.69-.72,7.04-.89,0,0,0,0,.01,0,1.19-.09,2.39-.15,3.58-.18h.02c.61-.01,1.21-.02,1.82-.02.16,0,.32,0,.48,0h.1c.16,0,.31,0,.46,0h.05c.15,0,.31,0,.46,0h.06c.15,0,.3,0,.46.01h.1c.15,0,.3.01.45.02h.02c.16,0,.32.01.48.02h.08c.33.02.67.04,1,.06h.03c5.57.31,11.08,1.32,16.41,2.95.4.12.79.25,1.19.37,1.4-1.44,3.35-2.33,5.52-2.33,4.25,0,7.69,3.44,7.69,7.69,0,.17,0,.33-.02.5,4.81,2.76,9.29,6.09,13.33,9.89,12.5,11.78,20.27,27.65,21.84,44.76.19,2.01.28,4.03.3,6.05,0,.15,0,.3,0,.45v.03c0,.17,0,.34,0,.52,0,.17,0,.34,0,.51,0,.17,0,.34,0,.51,0,.17,0,.34-.01.51,0,.17-.01.34-.02.51,0,.17-.01.34-.02.51,0,.17-.02.34-.02.51,0,.17-.02.34-.03.51,0,.17-.02.34-.03.51-.01.17-.02.34-.03.51-.01.17-.02.34-.04.51-.01.17-.03.34-.04.51-.01.17-.03.34-.05.5-.02.17-.03.34-.05.5-.02.17-.03.34-.05.5-.02.17-.04.33-.06.5-.04.33-.08.67-.12,1-.04.33-.09.66-.14,1-.14.99-.31,1.97-.49,2.96-.21,1.14-.46,2.27-.73,3.39-.75,3.15-1.73,6.24-2.91,9.25-.12.32-.37.53-.7.6-.33.07-.65-.01-.89-.25-6.48-6.13-12.96-12.26-19.41-18.41l-2.38-2.26-3.43-3.27-2.5-2.39-1.77-1.7-2.84,8.66-2.36-13.67-1.92-1.85c-.34-.33-.68-.66-1.03-.99l-2.16-2.1-11.11,11.27-.06.06-18.91,20.79c-.19.21-.44.32-.73.32h-8.81c-.4,0-.74-.22-.9-.59-.16-.37-.1-.77.17-1.06l20.22-22.23Z"/>
@@ -709,23 +816,23 @@
     </div>
     
     <!-- CONTEÚDO DO ADMINISTRADOR (INICIALMENTE OCULTO) -->
-    <div id="admin-content" class="hidden bg-gradient-to-br from-evereste-green to-evereste-blue min-h-screen">
+    <div id="admin-content" class="hidden bg-gradient-to-br from-gray-50 to-gray-200 min-h-screen">
          <div class="fixed top-4 right-4 z-40">
-            <button id="logout-btn" class="bg-white/20 backdrop-blur-sm text-white font-bold py-2 px-4 rounded-full shadow-lg hover:bg-white/30 transition-colors flex items-center gap-2">
+            <button id="logout-btn" class="bg-white/80 backdrop-blur-sm text-gray-700 font-bold py-2 px-4 rounded-full shadow-lg hover:bg-white transition-colors flex items-center gap-2">
                 <i data-feather="log-out" class="w-5 h-5"></i>
                 <span>Sair</span>
             </button>
         </div>
         
-        <header class="text-center pt-16 pb-12 px-4">
-            <h1 class="text-4xl md:text-5xl font-extrabold text-white">Dashboard Pesquisa de Satisfação CCSRI</h1>
-            <p class="text-white/80 mt-2">Resultados em tempo real das avaliações.</p>
+        <header class="text-center pt-16 pb-12 px-4 bg-white/50 backdrop-blur-sm border-b border-gray-200">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-800">Dashboard de Avaliações</h1>
+            <p class="text-gray-600 mt-2">Resultados em tempo real das pesquisas de satisfação.</p>
         </header>
 
         <main class="pb-16 md:pb-24 px-4 sm:px-6">
-            <div class="max-w-7xl mx-auto space-y-12">
+            <div class="max-w-7xl mx-auto space-y-12 mt-12">
                 <!-- Seção de Eventos -->
-                <div class="bg-white text-gray-800 p-4 sm:p-8 rounded-2xl shadow-lg">
+                <div id="event-dashboard-content" class="bg-white text-gray-800 p-4 sm:p-8 rounded-2xl shadow-lg">
                     <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                         <div>
                             <h3 class="text-2xl font-bold text-evereste-green mb-1">Resultados da Avaliação de Eventos</h3>
@@ -738,9 +845,14 @@
                                     <option value="all">Todos os Eventos</option>
                                 </select>
                             </div>
-                            <button id="export-events-csv" class="w-full sm:w-auto mt-2 sm:mt-6 bg-evereste-green text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-opacity-90 transition flex items-center justify-center gap-2">
-                                <i data-feather="download" class="w-4 h-4"></i> Exportar CSV
-                            </button>
+                            <div class="flex gap-2 w-full sm:w-auto mt-2 sm:mt-6">
+                                <button id="export-events-csv" class="w-full sm:w-auto bg-evereste-green text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-opacity-90 transition flex items-center justify-center gap-2">
+                                    <i data-feather="download" class="w-4 h-4"></i> CSV
+                                </button>
+                                <button id="export-events-pdf" class="w-full sm:w-auto bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-opacity-90 transition flex items-center justify-center gap-2">
+                                    <i data-feather="file-text" class="w-4 h-4"></i> PDF
+                                </button>
+                            </div>
                         </div>
                     </div>
                     
@@ -757,18 +869,34 @@
                         </ul>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div class="h-64 md:h-72"><canvas id="event-satisfaction-chart"></canvas></div>
-                        <div class="h-64 md:h-72"><canvas id="event-organization-chart"></canvas></div>
-                        <div class="h-64 md:h-72"><canvas id="event-speakers-chart"></canvas></div>
-                        <div class="h-64 md:h-72"><canvas id="event-content-chart"></canvas></div>
-                        <div class="h-64 md:h-72"><canvas id="event-facilities-chart"></canvas></div>
-                        <div class="h-64 md:h-72"><canvas id="event-recommend-chart"></canvas></div>
-                        <div class="md:col-span-2 lg:col-span-3 h-80"><canvas id="event-nps-chart"></canvas></div>
+                    <div id="event-charts-container">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div class="h-64 md:h-72"><canvas id="event-satisfaction-chart"></canvas></div>
+                            <div class="h-64 md:h-72"><canvas id="event-organization-chart"></canvas></div>
+                            <div class="h-64 md:h-72"><canvas id="event-speakers-chart"></canvas></div>
+                            <div class="h-64 md:h-72"><canvas id="event-content-chart"></canvas></div>
+                            <div class="h-64 md:h-72"><canvas id="event-facilities-chart"></canvas></div>
+                            <div class="h-64 md:h-72"><canvas id="event-recommend-chart"></canvas></div>
+                        </div>
+
+                        <!-- NOVA SEÇÃO DE INFRAESTRUTURA -->
+                        <div class="mt-10 pt-6 border-t border-gray-200">
+                            <h4 class="text-xl font-bold text-center text-gray-700 mb-6">Avaliação da Infraestrutura</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <div class="h-64 md:h-72"><canvas id="event-transmission-chart"></canvas></div>
+                                <div class="h-64 md:h-72"><canvas id="event-audio-video-chart"></canvas></div>
+                                <div class="h-64 md:h-72"><canvas id="event-connection-chart"></canvas></div>
+                                <div class="h-64 md:h-72"><canvas id="event-lighting-chart"></canvas></div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-10 pt-6 border-t border-gray-200">
+                             <div class="h-80"><canvas id="event-nps-chart"></canvas></div>
+                        </div>
                     </div>
                 </div>
                 <!-- Seção de Satisfação -->
-                <div class="bg-white text-gray-800 p-4 sm:p-8 rounded-2xl shadow-lg">
+                <div id="satisfaction-dashboard-content" class="bg-white text-gray-800 p-4 sm:p-8 rounded-2xl shadow-lg">
                     <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                         <div>
                             <h3 class="text-2xl font-bold text-evereste-blue mb-1">Resultados da Avaliação de Serviços (CCSRI)</h3>
@@ -781,9 +909,14 @@
                                     <option value="all">Todos os Colaboradores</option>
                                 </select>
                             </div>
-                            <button id="export-satisfaction-csv" class="w-full sm:w-auto mt-2 sm:mt-6 bg-evereste-blue text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-opacity-90 transition flex items-center justify-center gap-2">
-                                <i data-feather="download" class="w-4 h-4"></i> Exportar CSV
-                            </button>
+                            <div class="flex gap-2 w-full sm:w-auto mt-2 sm:mt-6">
+                                <button id="export-satisfaction-csv" class="w-full sm:w-auto bg-evereste-blue text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-opacity-90 transition flex items-center justify-center gap-2">
+                                    <i data-feather="download" class="w-4 h-4"></i> CSV
+                                </button>
+                                <button id="export-satisfaction-pdf" class="w-full sm:w-auto bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-opacity-90 transition flex items-center justify-center gap-2">
+                                    <i data-feather="file-text" class="w-4 h-4"></i> PDF
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -882,8 +1015,52 @@
                             <label class="flex items-center"><input type="radio" name="instalacoes" value="Ruim" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Ruim</span></label>
                         </div>
                     </fieldset>
-                    <fieldset>
-                        <legend class="block text-sm font-bold text-gray-700 mb-2">7. Você recomendaria este evento para outras pessoas?</legend>
+                    
+                    <!-- NOVAS PERGUNTAS DE INFRAESTRUTURA -->
+                     <div class="pt-4 mt-4 border-t border-gray-200">
+                        <h3 class="text-md font-bold text-gray-800 mb-4">Sobre a Infraestrutura (para eventos online/híbridos)</h3>
+                        <div class="space-y-6">
+                             <fieldset>
+                                <legend class="block text-sm font-bold text-gray-700 mb-2">7. Como foi a qualidade da transmissão?</legend>
+                                <div class="flex flex-wrap gap-x-6 gap-y-2">
+                                    <label class="flex items-center"><input type="radio" name="transmissao" value="Excelente" required class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Excelente</span></label>
+                                    <label class="flex items-center"><input type="radio" name="transmissao" value="Boa" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Boa</span></label>
+                                    <label class="flex items-center"><input type="radio" name="transmissao" value="Regular" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Regular</span></label>
+                                    <label class="flex items-center"><input type="radio" name="transmissao" value="Ruim" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Ruim</span></label>
+                                </div>
+                            </fieldset>
+                             <fieldset>
+                                <legend class="block text-sm font-bold text-gray-700 mb-2">8. Como você avalia a qualidade de áudio e vídeo?</legend>
+                                <div class="flex flex-wrap gap-x-6 gap-y-2">
+                                    <label class="flex items-center"><input type="radio" name="audio_video" value="Excelente" required class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Excelente</span></label>
+                                    <label class="flex items-center"><input type="radio" name="audio_video" value="Boa" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Boa</span></label>
+                                    <label class="flex items-center"><input type="radio" name="audio_video" value="Regular" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Regular</span></label>
+                                    <label class="flex items-center"><input type="radio" name="audio_video" value="Ruim" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Ruim</span></label>
+                                </div>
+                            </fieldset>
+                             <fieldset>
+                                <legend class="block text-sm font-bold text-gray-700 mb-2">9. Como você avalia a conexão/estabilidade da plataforma?</legend>
+                                <div class="flex flex-wrap gap-x-6 gap-y-2">
+                                    <label class="flex items-center"><input type="radio" name="conexao" value="Excelente" required class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Excelente</span></label>
+                                    <label class="flex items-center"><input type="radio" name="conexao" value="Boa" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Boa</span></label>
+                                    <label class="flex items-center"><input type="radio" name="conexao" value="Regular" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Regular</span></label>
+                                    <label class="flex items-center"><input type="radio" name="conexao" value="Ruim" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Ruim</span></label>
+                                </div>
+                            </fieldset>
+                             <fieldset>
+                                <legend class="block text-sm font-bold text-gray-700 mb-2">10. Como você avalia a iluminação (no local ou na transmissão)?</legend>
+                                <div class="flex flex-wrap gap-x-6 gap-y-2">
+                                    <label class="flex items-center"><input type="radio" name="iluminacao" value="Excelente" required class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Excelente</span></label>
+                                    <label class="flex items-center"><input type="radio" name="iluminacao" value="Boa" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Boa</span></label>
+                                    <label class="flex items-center"><input type="radio" name="iluminacao" value="Regular" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Regular</span></label>
+                                    <label class="flex items-center"><input type="radio" name="iluminacao" value="Ruim" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Ruim</span></label>
+                                </div>
+                            </fieldset>
+                        </div>
+                    </div>
+                    
+                    <fieldset class="pt-4 mt-4 border-t border-gray-200">
+                        <legend class="block text-sm font-bold text-gray-700 mb-2">11. Você recomendaria este evento para outras pessoas?</legend>
                         <div class="flex flex-wrap gap-x-6 gap-y-2">
                             <label class="flex items-center"><input type="radio" name="recomendaria" value="Sim" required class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Sim</span></label>
                             <label class="flex items-center"><input type="radio" name="recomendaria" value="Não" class="h-4 w-4 text-evereste-green focus:ring-evereste-green"><span class="ml-2">Não</span></label>
@@ -891,7 +1068,7 @@
                         </div>
                     </fieldset>
                     <div>
-                        <label for="nps-evento" class="block text-sm font-bold text-gray-700 mb-1">8. Em uma escala de 0 a 10, o quanto você recomendaria este evento para um amigo ou colega?</label>
+                        <label for="nps-evento" class="block text-sm font-bold text-gray-700 mb-1">12. Em uma escala de 0 a 10, o quanto você recomendaria este evento para um amigo ou colega?</label>
                         <select name="npsEvento" id="nps-evento" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-evereste-green focus:border-evereste-green">
                             <option value="" disabled selected>Selecione uma nota de 0 a 10</option>
                             <option value="0">0 - Nada provável</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10 - Extremamente provável</option>
@@ -1042,8 +1219,9 @@
             if(heroHeader){
                 heroHeader.addEventListener('mousemove', e => {
                     // Atualiza as variáveis CSS para o efeito de gradiente radial seguir o mouse.
-                    heroHeader.style.setProperty('--x', e.clientX + 'px');
-                    heroHeader.style.setProperty('--y', e.clientY + 'px');
+                    const rect = heroHeader.getBoundingClientRect();
+                    heroHeader.style.setProperty('--x', (e.clientX - rect.left) + 'px');
+                    heroHeader.style.setProperty('--y', (e.clientY - rect.top) + 'px');
                 });
             }
         });
